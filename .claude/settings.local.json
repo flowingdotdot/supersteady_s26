@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ipconfig:*)",
+      "Bash(python:*)",
+      "Bash(py:*)",
+      "Bash(dart --version:*)",
+      "Bash(dart run:*)",
+      "Bash(netsh advfirewall firewall show rule:*)",
+      "Bash(flutter install:*)",
+      "Bash(flutter pub get:*)"
+    ]
+  }
+}
