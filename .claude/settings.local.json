@@ -11,7 +11,9 @@
       "Bash(flutter pub get:*)",
       "Bash(flutter doctor:*)",
       "Bash(file:*)",
-      "Bash(adb install build/app/outputs/flutter-apk/app-release.apk)"
+      "Bash(adb install build/app/outputs/flutter-apk/app-release.apk)",
+      "Bash(git config --global user.name \"dan im\")",
+      "Bash(git config --global user.email \"bullfroginkorea@gmail.com\")"
     ]
   }
 }
