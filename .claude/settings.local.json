@@ -8,7 +8,9 @@
       "Bash(dart run:*)",
       "Bash(netsh advfirewall firewall show rule:*)",
       "Bash(flutter install:*)",
-      "Bash(flutter pub get:*)"
+      "Bash(flutter pub get:*)",
+      "Bash(flutter doctor:*)",
+      "Bash(file:*)"
     ]
   }
 }

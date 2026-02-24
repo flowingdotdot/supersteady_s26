@@ -3,7 +3,7 @@ import 'dart:io';
 
 void main() async {
   final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
-  final target = InternetAddress('192.168.240.120');
+  final target = InternetAddress('192.168.240.3');
   const port = 10025;
   var sendN = true;
 
@@ -12,8 +12,10 @@ void main() async {
 
   while (true) {
     final command = sendN ? 'N' : 'F';
+
+    socket.send(utf8.encode('I'), target, port);
     socket.send(utf8.encode(command), target, port);
-    print('전송: "$command" → 192.168.240.120:$port');
+    print('전송: "$command" → 192.168.240.3:$port');
     sendN = !sendN;
     await Future.delayed(const Duration(seconds: 2));
   }
