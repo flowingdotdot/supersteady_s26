@@ -205,7 +205,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             // PLAY 타이머 만료 → UDP 'F' 전송 후 END로
             _sendUdp('F').then((_) => _goTo(AppState.end));
           } else {
-            _goTo(AppState.idle);
+            // Ready/End 타이머 만료 → UDP 'J' 전송 후 IDLE로
+            _sendUdp('J').then((_) => _goTo(AppState.idle));
           }
         }
       });
@@ -229,7 +230,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         if (_state == AppState.play) {
           _sendUdp('F').then((_) => _goTo(AppState.end));
         } else {
-          _goTo(AppState.idle);
+          // Ready/End 타이머 만료 → UDP 'J' 전송 후 IDLE로
+          _sendUdp('J').then((_) => _goTo(AppState.idle));
         }
       }
     });
