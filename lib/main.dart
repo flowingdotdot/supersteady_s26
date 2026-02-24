@@ -96,17 +96,17 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
-    AssetImage('assets/images/1_idle.jpg'),
-    AssetImage('assets/images/2_ready.jpg'),
-    AssetImage('assets/images/3_ready.jpg'),
-    AssetImage('assets/images/4_ready.jpg'),
-    AssetImage('assets/images/5_ready.jpg'),
-    AssetImage('assets/images/6_ready.jpg'),
-    AssetImage('assets/images/7_play.jpg'),
-    AssetImage('assets/images/8_end.jpg'),
-    AssetImage('assets/images/9_end.jpg'),
-    AssetImage('assets/images/10_end.jpg'),
-    AssetImage('assets/images/11_end.jpg'),
+    AssetImage('assets/images/1_idle.png'),
+    AssetImage('assets/images/2_ready.png'),
+    AssetImage('assets/images/3_ready.png'),
+    AssetImage('assets/images/4_ready.png'),
+    AssetImage('assets/images/5_ready.png'),
+    AssetImage('assets/images/6_ready.png'),
+    AssetImage('assets/images/7_play.png'),
+    AssetImage('assets/images/8_end.png'),
+    AssetImage('assets/images/9_end.png'),
+    AssetImage('assets/images/10_end.png'),
+    AssetImage('assets/images/11_end.png'),
   ];
 
   // 이미지 로딩 완료 여부
@@ -196,6 +196,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         AppState.end => _endSeconds,
         _ => 10,
       };
+
       _remaining = seconds;
       _timer = Timer.periodic(const Duration(seconds: 1), (t) {
         setState(() => _remaining--);
