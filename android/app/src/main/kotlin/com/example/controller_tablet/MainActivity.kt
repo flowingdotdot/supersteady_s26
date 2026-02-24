@@ -173,6 +173,23 @@ class MainActivity : FlutterActivity() {
                     }
 
                     // =====================================================
+                    // clearDeviceOwner: Device Owner 해제
+                    // =====================================================
+                    "clearDeviceOwner" -> {
+                        try {
+                            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                            if (dpm.isDeviceOwnerApp(packageName)) {
+                                dpm.clearDeviceOwnerApp(packageName)
+                                result.success(true)
+                            } else {
+                                result.success(false)
+                            }
+                        } catch (e: Exception) {
+                            result.error("CLEAR_OWNER_ERROR", e.message, null)
+                        }
+                    }
+
+                    // =====================================================
                     // openAppSettings: 앱 권한 설정 화면 열기
                     // =====================================================
                     "openAppSettings" -> {

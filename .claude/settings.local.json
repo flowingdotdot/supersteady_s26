@@ -10,7 +10,8 @@
       "Bash(flutter install:*)",
       "Bash(flutter pub get:*)",
       "Bash(flutter doctor:*)",
-      "Bash(file:*)"
+      "Bash(file:*)",
+      "Bash(adb install build/app/outputs/flutter-apk/app-release.apk)"
     ]
   }
 }

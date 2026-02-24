@@ -22,13 +22,31 @@ adb install build/app/outputs/flutter-apk/app-release.apk
 adb shell dpm set-device-owner com.example.controller_tablet/.AdminReceiver
 ```
 
-### 업데이트
+### 업데이트 (동일 서명)
 
 ```bash
 adb install build/app/outputs/flutter-apk/app-release.apk
 ```
 
 서명 키가 동일하므로 덮어쓰기 설치됩니다. Device Owner 재등록 불필요.
+
+### 재설치 (서명이 다를 때)
+
+서명이 다른 APK로 교체할 때는 Device Owner 해제 → 삭제 → 재설치 순서로 진행:
+
+```bash
+# 1. Device Owner 해제
+adb shell dpm remove-active-admin com.example.controller_tablet/.AdminReceiver
+
+# 2. 기존 앱 삭제
+adb uninstall com.example.controller_tablet
+
+# 3. 새 APK 설치
+adb install build/app/outputs/flutter-apk/app-release.apk
+
+# 4. Device Owner 재등록
+adb shell dpm set-device-owner com.example.controller_tablet/.AdminReceiver
+```
 
 ## 키오스크 모드 (Device Owner)
 

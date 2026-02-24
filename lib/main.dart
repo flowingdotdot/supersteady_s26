@@ -534,7 +534,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                       ? Align(
                           alignment: Alignment.bottomCenter,
                           child: Padding(
-                            padding: const EdgeInsets.only(bottom: 40),
+                            padding: const EdgeInsets.only(bottom: 70),
                             child: GestureDetector(
                               onTapDown: (_) {
                                 setState(() => _endHomePressed = true);
@@ -548,8 +548,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                               onTapCancel: () =>
                                   setState(() => _endHomePressed = false),
                               child: Container(
-                                width: 370,
-                                height: 85,
+                                width: 570,
+                                height: 95,
                                 decoration: BoxDecoration(
                                   color: _endHomePressed
                                       ? Colors.white.withValues(alpha: 0.25)
@@ -610,8 +610,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                 },
                 onTapCancel: () => setState(() => _endNextPressed = false),
                 child: Container(
-                  width: 80,
-                  height: 80,
+                  width: 160,
+                  height: 100,
                   decoration: BoxDecoration(
                     color: _endNextPressed
                         ? Colors.white.withValues(alpha: 0.25)
@@ -664,7 +664,7 @@ class _TestPageState extends State<TestPage> {
   static const _platform = MethodChannel('com.example.controller_tablet/kiosk');
 
   String _targetIp = '192.168.240.255';
-  int _targetPort = 4210;
+  int _targetPort = 10025;
   String _status = '대기 중';
   late TextEditingController _ipController;
   late TextEditingController _portController;
@@ -820,6 +820,15 @@ class _TestPageState extends State<TestPage> {
       await _platform.invokeMethod('openAppSettings');
     } on PlatformException catch (e) {
       debugPrint('설정 열기 오류: $e');
+    }
+  }
+
+  Future<void> _clearDeviceOwner() async {
+    try {
+      await _platform.invokeMethod('clearDeviceOwner');
+      setState(() => _isDeviceOwner = false);
+    } on PlatformException catch (e) {
+      debugPrint('Device Owner 해제 오류: $e');
     }
   }
 
@@ -1007,6 +1016,14 @@ class _TestPageState extends State<TestPage> {
                   trailing: const Icon(Icons.open_in_new),
                   onTap: _openAppSettings,
                 ),
+                if (_isDeviceOwner)
+                  ListTile(
+                    leading: const Icon(Icons.delete_forever, color: Colors.red),
+                    title: const Text('Device Owner 해제'),
+                    subtitle: const Text('해제 후 앱 삭제/재설치 가능'),
+                    trailing: const Icon(Icons.warning, color: Colors.red),
+                    onTap: _clearDeviceOwner,
+                  ),
                 const SizedBox(height: 40),
                 SizedBox(
                   width: double.infinity,
