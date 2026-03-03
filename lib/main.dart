@@ -96,17 +96,16 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
-    AssetImage('assets/images/1_idle.png'),
-    AssetImage('assets/images/2_ready.png'),
-    AssetImage('assets/images/3_ready.png'),
-    AssetImage('assets/images/4_ready.png'),
-    AssetImage('assets/images/5_ready.png'),
-    AssetImage('assets/images/6_ready.png'),
-    AssetImage('assets/images/7_play.png'),
-    AssetImage('assets/images/8_end.png'),
-    AssetImage('assets/images/9_end.png'),
-    AssetImage('assets/images/10_end.png'),
-    AssetImage('assets/images/11_end.png'),
+    AssetImage('assets/images/h1_idle.png'),
+    AssetImage('assets/images/h2_ready.png'),
+    AssetImage('assets/images/h3_ready.png'),
+    AssetImage('assets/images/h4_ready.png'),
+    AssetImage('assets/images/h5_ready.png'),
+    AssetImage('assets/images/h6_ready.png'),
+    AssetImage('assets/images/h7_play.png'),
+    AssetImage('assets/images/h8_end.png'),
+    AssetImage('assets/images/h9_end.png'),
+    AssetImage('assets/images/h10_end.png'),
   ];
 
   // 이미지 로딩 완료 여부
@@ -123,6 +122,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   bool _readyPrevPressed = false;
   bool _readyNextPressed = false;
   bool _playExitPressed = false;
+  bool _playNextPressed = false;
   bool _endExitPressed = false;
   bool _endPrevPressed = false;
   bool _endNextPressed = false;
@@ -203,10 +203,13 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         if (_remaining <= 0) {
           t.cancel();
           if (_state == AppState.play) {
-            // PLAY 타이머 만료 → UDP 'F' 전송 후 END로
-            _sendUdp('F').then((_) => _goTo(AppState.end));
+            // PLAY 타이머 만료 → UDP 'F' 전송만 (페이지 이동 없음)
+            _sendUdp('F');
+          } else if (_state == AppState.ready) {
+            // Ready 타이머 만료 → UDP 'J' 전송만 (페이지 이동 없음)
+            _sendUdp('J');
           } else {
-            // Ready/End 타이머 만료 → UDP 'J' 전송 후 IDLE로
+            // End 타이머 만료 → UDP 'J' 전송 후 IDLE로
             _sendUdp('J').then((_) => _goTo(AppState.idle));
           }
         }
@@ -230,8 +233,11 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         t.cancel();
         if (_state == AppState.play) {
           _sendUdp('F').then((_) => _goTo(AppState.end));
+        } else if (_state == AppState.ready) {
+          // Ready 타이머 만료 → UDP 'J' 전송만 (페이지 이동 없음)
+          _sendUdp('J');
         } else {
-          // Ready/End 타이머 만료 → UDP 'J' 전송 후 IDLE로
+          // End 타이머 만료 → UDP 'J' 전송 후 IDLE로
           _sendUdp('J').then((_) => _goTo(AppState.idle));
         }
       }
@@ -484,6 +490,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       ),
       child: Stack(
         children: [
+          // 우측 상단 IDLE 복귀 버튼
           Positioned(
             top: 32,
             right: 32,
@@ -507,14 +514,40 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
               ),
             ),
           ),
+          // 우측 중앙 다음(END) 버튼
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: GestureDetector(
+                onTapDown: (_) => setState(() => _playNextPressed = true),
+                onTapUp: (_) {
+                  setState(() => _playNextPressed = false);
+                  _goTo(AppState.end);
+                },
+                onTapCancel: () => setState(() => _playNextPressed = false),
+                child: Container(
+                  width: 160,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: _playNextPressed
+                        ? Colors.white.withValues(alpha: 0.25)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // === END 화면 (8_end ~ 11_end 슬라이드) ===
+  // === END 화면 (8_end ~ 10_end 슬라이드, 10_end에 첫화면 버튼) ===
   Widget _buildEndPage() {
-    final endImages = _allImages.sublist(7, 11); // 8_end ~ 11_end
+    final endImages = _allImages.sublist(7, 10); // 8_end ~ 10_end
     return Listener(
       onPointerDown: (_) => _resetTimer(),
       child: Stack(
@@ -563,6 +596,30 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                       : null,
                 ),
             ],
+          ),
+          // 우측 상단 IDLE 복귀 버튼 (h8_end에서만 표시)
+          Positioned(
+            top: 32,
+            right: 32,
+            child: GestureDetector(
+              onTapDown: (_) => setState(() => _endExitPressed = true),
+              onTapUp: (_) async {
+                setState(() => _endExitPressed = false);
+                await _sendUdp('I');
+                _goTo(AppState.idle);
+              },
+              onTapCancel: () => setState(() => _endExitPressed = false),
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: _endExitPressed
+                      ? Colors.white.withValues(alpha: 0.25)
+                      : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
           ),
           // 좌측 중앙 이전 버튼
           Positioned(
@@ -618,30 +675,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                ),
-              ),
-            ),
-          ),
-          // 우측 상단 IDLE 복귀 버튼
-          Positioned(
-            top: 32,
-            right: 32,
-            child: GestureDetector(
-              onTapDown: (_) => setState(() => _endExitPressed = true),
-              onTapUp: (_) async {
-                setState(() => _endExitPressed = false);
-                await _sendUdp('I');
-                _goTo(AppState.idle);
-              },
-              onTapCancel: () => setState(() => _endExitPressed = false),
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: _endExitPressed
-                      ? Colors.white.withValues(alpha: 0.25)
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
                 ),
               ),
             ),
