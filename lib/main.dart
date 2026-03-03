@@ -211,8 +211,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             _sendUdp('F');
             setState(() => _playTimerExpired = true);
           } else {
-            // Ready/End 타이머 만료 → UDP 'J' 전송 후 IDLE로
-            _sendUdp('J').then((_) => _goTo(AppState.idle));
+            // Ready/End 타이머 만료 → UDP 'I' 전송 후 IDLE로
+            _sendUdp('I').then((_) => _goTo(AppState.idle));
           }
         }
       });
@@ -234,13 +234,12 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       if (_remaining <= 0) {
         t.cancel();
         if (_state == AppState.play) {
-          _sendUdp('F').then((_) => _goTo(AppState.end));
-        } else if (_state == AppState.ready) {
-          // Ready 타이머 만료 → UDP 'J' 전송만 (페이지 이동 없음)
-          _sendUdp('J');
+          // PLAY 타이머 만료 → UDP 'F' 전송 + 버튼 활성화 (페이지 이동 없음)
+          _sendUdp('F');
+          setState(() => _playTimerExpired = true);
         } else {
-          // End 타이머 만료 → UDP 'J' 전송 후 IDLE로
-          _sendUdp('J').then((_) => _goTo(AppState.idle));
+          // Ready/End 타이머 만료 → UDP 'I' 전송 후 IDLE로
+          _sendUdp('I').then((_) => _goTo(AppState.idle));
         }
       }
     });
