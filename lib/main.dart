@@ -128,6 +128,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   bool _endNextPressed = false;
   bool _endHomePressed = false;
 
+  // Play 타이머 만료 여부 (만료 전까지 다음 버튼 비활성화)
+  bool _playTimerExpired = false;
+
   // 숨겨진 관리자 진입용
   int _tapCount = 0;
   DateTime? _lastTap;
@@ -181,6 +184,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _timer?.cancel();
     setState(() {
       _state = newState;
+      if (newState == AppState.play) _playTimerExpired = false;
     });
     _pageController.animateToPage(
       newState.index,
@@ -203,13 +207,11 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         if (_remaining <= 0) {
           t.cancel();
           if (_state == AppState.play) {
-            // PLAY 타이머 만료 → UDP 'F' 전송만 (페이지 이동 없음)
+            // PLAY 타이머 만료 → UDP 'F' 전송 + 버튼 활성화 (페이지 이동 없음)
             _sendUdp('F');
-          } else if (_state == AppState.ready) {
-            // Ready 타이머 만료 → UDP 'J' 전송만 (페이지 이동 없음)
-            _sendUdp('J');
+            setState(() => _playTimerExpired = true);
           } else {
-            // End 타이머 만료 → UDP 'J' 전송 후 IDLE로
+            // Ready/End 타이머 만료 → UDP 'J' 전송 후 IDLE로
             _sendUdp('J').then((_) => _goTo(AppState.idle));
           }
         }
@@ -514,32 +516,33 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
               ),
             ),
           ),
-          // 우측 중앙 다음(END) 버튼
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: GestureDetector(
-                onTapDown: (_) => setState(() => _playNextPressed = true),
-                onTapUp: (_) {
-                  setState(() => _playNextPressed = false);
-                  _goTo(AppState.end);
-                },
-                onTapCancel: () => setState(() => _playNextPressed = false),
-                child: Container(
-                  width: 160,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: _playNextPressed
-                        ? Colors.white.withValues(alpha: 0.25)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
+          // 우측 중앙 다음(END) 버튼 — 타이머 만료 후에만 활성화
+          if (_playTimerExpired)
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: GestureDetector(
+                  onTapDown: (_) => setState(() => _playNextPressed = true),
+                  onTapUp: (_) {
+                    setState(() => _playNextPressed = false);
+                    _goTo(AppState.end);
+                  },
+                  onTapCancel: () => setState(() => _playNextPressed = false),
+                  child: Container(
+                    width: 160,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: _playNextPressed
+                          ? Colors.white.withValues(alpha: 0.25)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
