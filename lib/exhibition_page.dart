@@ -248,10 +248,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   Widget _buildIdlePage() {
     return Container(
       decoration: BoxDecoration(
-        image: DecorationImage(
-          image: _allImages[0],
-          fit: BoxFit.cover,
-        ),
+        image: DecorationImage(image: _allImages[0], fit: BoxFit.cover),
       ),
       child: Align(
         alignment: Alignment.bottomCenter,
@@ -307,15 +304,15 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                               left: 114,
                               bottom: 98,
                             ),
-                            child: GestureDetector(
-                              onTapDown: (_) =>
-                                  setState(() => _readyStartPressed = true),
-                              onTapUp: (_) async {
-                                setState(() => _readyStartPressed = false);
+                            child: Listener(
+                              onPointerDown: (_) async {
+                                setState(() => _readyStartPressed = true);
                                 await _sendUdp('N');
                                 _goTo(AppState.play);
                               },
-                              onTapCancel: () =>
+                              onPointerUp: (_) =>
+                                  setState(() => _readyStartPressed = false),
+                              onPointerCancel: (_) =>
                                   setState(() => _readyStartPressed = false),
                               child: Container(
                                 width: 370,
@@ -425,10 +422,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   Widget _buildPlayPage() {
     return Container(
       decoration: BoxDecoration(
-        image: DecorationImage(
-          image: _allImages[6],
-          fit: BoxFit.cover,
-        ),
+        image: DecorationImage(image: _allImages[6], fit: BoxFit.cover),
       ),
       child: Stack(
         children: [
@@ -436,14 +430,14 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           Positioned(
             top: 32,
             right: 32,
-            child: GestureDetector(
-              onTapDown: (_) => setState(() => _playExitPressed = true),
-              onTapUp: (_) async {
-                setState(() => _playExitPressed = false);
+            child: Listener(
+              onPointerDown: (_) async {
+                setState(() => _playExitPressed = true);
                 await _sendUdp('F');
                 _goTo(AppState.idle);
               },
-              onTapCancel: () => setState(() => _playExitPressed = false),
+              onPointerUp: (_) => setState(() => _playExitPressed = false),
+              onPointerCancel: (_) => setState(() => _playExitPressed = false),
               child: Container(
                 width: 80,
                 height: 80,

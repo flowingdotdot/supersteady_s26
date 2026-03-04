@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,6 +41,9 @@ class _TestPageState extends State<TestPage> {
   bool _landscapeMode = false;
   bool _wakeLock = false;
 
+  // --- 이동 버튼 반복 전송용 ---
+  Timer? _moveTimer;
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +52,7 @@ class _TestPageState extends State<TestPage> {
     _readyTimerController = TextEditingController();
     _playTimerController = TextEditingController();
     _endTimerController = TextEditingController();
+    UdpService.warmUp(); // 소켓 미리 준비 → sendFast가 동기로 동작
     _loadSettings();
   }
 
@@ -164,109 +170,172 @@ class _TestPageState extends State<TestPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        backgroundColor: _cardDark,
-        insetPadding: const EdgeInsets.all(24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: SizedBox(
-          width: double.infinity,
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '영점 셋팅',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: _textWhite,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    GestureDetector(
-                      onTapDown: (_) => _sendUdp(UdpCommand.moveLeft),
-                      onTapUp: (_) => _sendUdp(UdpCommand.stop),
-                      onTapCancel: () => _sendUdp(UdpCommand.stop),
-                      child: ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _greenDark,
-                          foregroundColor: _textWhite,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                        ),
-                        child: const Text(
-                          '< 왼쪽',
-                          style: TextStyle(fontSize: 18),
-                        ),
-                      ),
-                    ),
+      builder: (ctx) {
+        String lastSignal = '';
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            void sendAndShow(String command) {
+              _sendUdpFast(command);
+              setDialogState(() => lastSignal = command);
+            }
 
-                    GestureDetector(
-                      onTapDown: (_) => _sendUdp(UdpCommand.moveRight),
-                      onTapUp: (_) => _sendUdp(UdpCommand.stop),
-                      onTapCancel: () => _sendUdp(UdpCommand.stop),
-                      child: ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _greenDark,
-                          foregroundColor: _textWhite,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                        ),
-                        child: const Text(
-                          '오른쪽 >',
-                          style: TextStyle(fontSize: 18),
+            return Dialog(
+              backgroundColor: _cardDark,
+              insetPadding: const EdgeInsets.all(24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        '영점 셋팅',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: _textWhite,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () => _sendUdp(UdpCommand.saveOrigin),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _green,
-                      foregroundColor: _textWhite,
-                    ),
-                    child: const Text(
-                      '현재값 원점 저장',
-                      style: TextStyle(fontSize: 18),
-                    ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        '왼쪽/오른쪽을 누르면 모터가 해당 방향으로 회전합니다.\n멈추고 싶을 때 멈춤을 눌러주세요.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 15, color: _textGray),
+                      ),
+                      const SizedBox(height: 12),
+                      // 신호 표시
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8,
+                          horizontal: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _bgDark,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          lastSignal.isEmpty
+                              ? '대기 중'
+                              : '전송: $lastSignal (${UdpCommand.nameOf(lastSignal)})',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: lastSignal == 'S'
+                                ? Colors.orange
+                                : _greenLight,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _calibBtn(
+                            ' 왼쪽',
+                            () => sendAndShow('R'),
+                            icon: Icons.arrow_back,
+                          ),
+                          _calibBtn(
+                            '멈춤',
+                            () => sendAndShow('S'),
+                            icon: Icons.stop,
+                            isStop: true,
+                          ),
+                          _calibBtn(
+                            '오른쪽 ',
+                            () => sendAndShow('L'),
+                            icon: Icons.arrow_forward,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            _sendUdp(UdpCommand.saveOrigin);
+                            setDialogState(() => lastSignal = 'O');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _green,
+                            foregroundColor: _textWhite,
+                          ),
+                          child: const Text(
+                            '현재값 원점 저장',
+                            style: TextStyle(fontSize: 18),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: TextButton(
+                          onPressed: () {
+                            _sendUdpFast(UdpCommand.stop);
+                            Navigator.of(ctx).pop();
+                          },
+                          child: const Text(
+                            '닫기',
+                            style: TextStyle(fontSize: 16, color: _textGray),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: TextButton(
-                    onPressed: () {
-                      _sendUdp(UdpCommand.stop);
-                      Navigator.of(ctx).pop();
-                    },
-                    child: const Text(
-                      '닫기',
-                      style: TextStyle(fontSize: 16, color: _textGray),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+              ),
+            );
+          },
+        );
+      },
     );
+  }
+
+  void _startMoving(String command) {
+    _sendUdpFast(command);
+    _moveTimer?.cancel();
+    _moveTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      _sendUdpFast(command);
+    });
+  }
+
+  void _stopMoving() {
+    _moveTimer?.cancel();
+    _moveTimer = null;
+    // 멈춤 명령 3회 연속 전송 — 확실하게 정지시키기 위해
+    _sendUdpFast(UdpCommand.stop);
+    _sendUdpFast(UdpCommand.stop);
+    _sendUdpFast(UdpCommand.stop);
+  }
+
+  // Widget _moveButton(String label, String command) {
+  //   return Listener(
+  //     behavior: HitTestBehavior.opaque,
+  //     onPointerDown: (_) => _startMoving(command),
+  //     // onPointerUp: (_) => _stopMoving(),
+  //     // onPointerCancel: (_) => _stopMoving(),
+  //     child: Container(
+  //       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+  //       decoration: BoxDecoration(
+  //         color: _greenDark,
+  //         borderRadius: BorderRadius.circular(8),
+  //       ),
+  //       child: Text(
+  //         label,
+  //         style: const TextStyle(fontSize: 18, color: _textWhite),
+  //       ),
+  //     ),
+  //   );
+  // }
+
+  /// 즉시 전송 (await 없이 fire-and-forget) — 왼쪽/오른쪽/멈춤 등 반응속도 중요한 곳용
+  void _sendUdpFast(String command) {
+    UdpService.sendFast(command, _targetIp, _targetPort);
   }
 
   Future<void> _sendUdp(String command) async {
@@ -288,6 +357,7 @@ class _TestPageState extends State<TestPage> {
 
   @override
   void dispose() {
+    _moveTimer?.cancel();
     _ipController.dispose();
     _portController.dispose();
     _readyTimerController.dispose();
@@ -451,20 +521,23 @@ class _TestPageState extends State<TestPage> {
                       Expanded(
                         child: SizedBox(
                           height: 52,
-                          child: ElevatedButton(
-                            onPressed: () => _sendUdp('N'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _green,
-                              foregroundColor: _textWhite,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                          child: GestureDetector(
+                            onTapDown: (_) => _sendUdp('N'),
+                            child: ElevatedButton(
+                              onPressed: () {},
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _green,
+                                foregroundColor: _textWhite,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
-                            ),
-                            child: const Text(
-                              'ON',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                              child: const Text(
+                                'ON',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
@@ -474,21 +547,24 @@ class _TestPageState extends State<TestPage> {
                       Expanded(
                         child: SizedBox(
                           height: 52,
-                          child: ElevatedButton(
-                            onPressed: () => _sendUdp('F'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _cardDark,
-                              foregroundColor: _textWhite,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                side: const BorderSide(color: _textGray),
+                          child: GestureDetector(
+                            onTapDown: (_) => _sendUdp('F'),
+                            child: ElevatedButton(
+                              onPressed: () {},
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _cardDark,
+                                foregroundColor: _textWhite,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  side: const BorderSide(color: _textGray),
+                                ),
                               ),
-                            ),
-                            child: const Text(
-                              'OFF',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                              child: const Text(
+                                'OFF',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
@@ -585,6 +661,37 @@ class _TestPageState extends State<TestPage> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _calibBtn(
+    String label,
+    VoidCallback onTap, {
+    IconData? icon,
+    bool isStop = false,
+  }) {
+    return GestureDetector(
+      onTapDown: (_) => onTap(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        decoration: BoxDecoration(
+          color: isStop ? Colors.red.shade800 : _greenDark,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, color: _textWhite, size: 20),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: const TextStyle(fontSize: 18, color: _textWhite),
+            ),
+          ],
         ),
       ),
     );
