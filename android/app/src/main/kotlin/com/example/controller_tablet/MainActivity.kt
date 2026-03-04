@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -29,10 +30,52 @@ class MainActivity : FlutterActivity() {
     // 전원 버튼으로 화면 꺼지면 즉시 다시 켜는 리시버
     // 키오스크 모드 활성 상태에서만 동작
     // =====================================================
+    private fun isCharging(): Boolean {
+        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        return bm.isCharging
+    }
+
+    // 충전 상태 변경 감지: 충전 시 화면 켜짐 유지, 비충전 시 화면 꺼짐 허용
+    private val powerReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (!kioskActive) return
+            runOnUiThread {
+                if (isCharging()) {
+                    val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                    val adminComponent = ComponentName(this@MainActivity, AdminReceiver::class.java)
+                    if (dpm.isDeviceOwnerApp(packageName)) {
+                        dpm.setKeyguardDisabled(adminComponent, true)
+                    }
+                    window.addFlags(
+                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                            or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                            or WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                    )
+                    wakeUpScreen()
+                } else {
+                    window.clearFlags(
+                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                            or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                            or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                            or WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                    )
+                    val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                    val adminComponent = ComponentName(this@MainActivity, AdminReceiver::class.java)
+                    if (dpm.isDeviceOwnerApp(packageName)) {
+                        dpm.setKeyguardDisabled(adminComponent, false)
+                    }
+                    if (dpm.isAdminActive(adminComponent)) {
+                        dpm.lockNow()
+                    }
+                }
+            }
+        }
+    }
+
     private val screenOffReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_SCREEN_OFF && kioskActive) {
-                // 500ms 딜레이 후 깨우기 (즉시 하면 시스템이 무시함)
+            if (intent.action == Intent.ACTION_SCREEN_OFF && kioskActive && isCharging()) {
+                // 충전 중일 때만 화면 다시 켜기 (비충전 시 화면 꺼짐 허용)
                 handler.postDelayed({ wakeUpScreen() }, 500)
             }
         }
@@ -78,17 +121,24 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
-        val filter = IntentFilter(Intent.ACTION_SCREEN_OFF)
+        val screenFilter = IntentFilter(Intent.ACTION_SCREEN_OFF)
+        val powerFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(screenOffReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(screenOffReceiver, screenFilter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(powerReceiver, powerFilter, Context.RECEIVER_NOT_EXPORTED)
         } else {
-            registerReceiver(screenOffReceiver, filter)
+            registerReceiver(screenOffReceiver, screenFilter)
+            registerReceiver(powerReceiver, powerFilter)
         }
     }
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         unregisterReceiver(screenOffReceiver)
+        unregisterReceiver(powerReceiver)
         super.onDestroy()
     }
 
