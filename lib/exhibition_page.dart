@@ -259,9 +259,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           padding: const EdgeInsets.only(bottom: 132),
           child: GestureDetector(
             onTapDown: (_) => setState(() => _idlePressed = true),
-            onTapUp: (_) async {
+            onTapUp: (_) {
               setState(() => _idlePressed = false);
-              await _sendUdp('O');
               _goTo(AppState.ready);
             },
             onTapCancel: () => setState(() => _idlePressed = false),
