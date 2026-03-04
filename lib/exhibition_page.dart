@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'test_page.dart';
 import 'udp_service.dart';
@@ -30,6 +31,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // UDP 전송용
   String _targetIp = '192.168.240.255';
   int _targetPort = 4210;
+
+  // 네이티브 채널 (키오스크 모드용)
+  static const _platform = MethodChannel('com.example.controller_tablet/kiosk');
 
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
@@ -94,12 +98,28 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   Future<void> _loadTimerSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _readySeconds = prefs.getInt('timer_ready') ?? 10;
-      _playSeconds = prefs.getInt('timer_play') ?? 10;
-      _endSeconds = prefs.getInt('timer_end') ?? 10;
+      _readySeconds = prefs.getInt('timer_ready') ?? 120;
+      _playSeconds = prefs.getInt('timer_play') ?? 14;
+      _endSeconds = prefs.getInt('timer_end') ?? 120;
       _targetIp = prefs.getString('target_ip') ?? '192.168.240.255';
       _targetPort = prefs.getInt('target_port') ?? 4210;
     });
+
+    // 저장된 세팅 복원 적용
+    if (prefs.getBool('kiosk_mode') ?? false) {
+      try {
+        await _platform.invokeMethod('startKiosk');
+      } on PlatformException catch (_) {}
+    }
+    if (prefs.getBool('landscape_mode') ?? false) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+    if (prefs.getBool('wake_lock') ?? false) {
+      await WakelockPlus.enable();
+    }
   }
 
   Future<void> _sendUdp(String command) async {
