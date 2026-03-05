@@ -30,7 +30,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // UDP 전송용
   String _targetIp = '192.168.240.255';
-  int _targetPort = 4210;
+  int _targetPort = 10025;
 
   // 네이티브 채널 (키오스크 모드용)
   static const _platform = MethodChannel('com.example.controller_tablet/kiosk');
@@ -45,8 +45,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     AssetImage('assets/images/h6_ready.png'),
     AssetImage('assets/images/h7_play.png'),
     AssetImage('assets/images/h8_end.png'),
-    AssetImage('assets/images/h9_end.png'),
-    AssetImage('assets/images/h10_end.png'),
   ];
 
   // 이미지 로딩 완료 여부
@@ -54,8 +52,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 슬라이드 컨트롤러
   final PageController _readyPageController = PageController();
-  final PageController _endPageController = PageController();
-
   // 버튼 탭 피드백
   bool _idlePressed = false;
   bool _readyExitPressed = false;
@@ -65,9 +61,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   bool _playExitPressed = false;
   bool _playNextPressed = false;
   bool _endExitPressed = false;
-  bool _endPrevPressed = false;
-  bool _endNextPressed = false;
-  bool _endHomePressed = false;
 
   // Play 타이머 만료 여부 (만료 전까지 다음 버튼 비활성화)
   bool _playTimerExpired = false;
@@ -102,7 +95,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       _playSeconds = prefs.getInt('timer_play') ?? 14;
       _endSeconds = prefs.getInt('timer_end') ?? 120;
       _targetIp = prefs.getString('target_ip') ?? '192.168.240.255';
-      _targetPort = prefs.getInt('target_port') ?? 4210;
+      _targetPort = prefs.getInt('target_port') ?? 10025;
     });
 
     // 저장된 세팅 복원 적용
@@ -207,7 +200,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _timer?.cancel();
     _pageController.dispose();
     _readyPageController.dispose();
-    _endPageController.dispose();
     super.dispose();
   }
 
@@ -482,57 +474,16 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     );
   }
 
-  // === END 화면 (8_end ~ 10_end 슬라이드, 10_end에 첫화면 버튼) ===
+  // === END 화면 (h8_end 단일) ===
   Widget _buildEndPage() {
-    final endImages = _allImages.sublist(7, 10);
     return Listener(
       onPointerDown: (_) => _resetTimer(),
       child: Stack(
         children: [
-          PageView(
-            controller: _endPageController,
-            children: [
-              for (int i = 0; i < endImages.length; i++)
-                Container(
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: endImages[i],
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  child: i == endImages.length - 1
-                      ? Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 70),
-                            child: GestureDetector(
-                              onTapDown: (_) {
-                                setState(() => _endHomePressed = true);
-                                HapticFeedback.lightImpact();
-                              },
-                              onTapUp: (_) async {
-                                setState(() => _endHomePressed = false);
-                                await _sendUdp('I');
-                                _goTo(AppState.idle);
-                              },
-                              onTapCancel: () =>
-                                  setState(() => _endHomePressed = false),
-                              child: Container(
-                                width: 570,
-                                height: 95,
-                                decoration: BoxDecoration(
-                                  color: _endHomePressed
-                                      ? Colors.white.withValues(alpha: 0.25)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
-            ],
+          Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(image: _allImages[7], fit: BoxFit.cover),
+            ),
           ),
           // 우측 상단 IDLE 복귀 버튼
           Positioned(
@@ -554,64 +505,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                       ? Colors.white.withValues(alpha: 0.25)
                       : Colors.transparent,
                   shape: BoxShape.circle,
-                ),
-              ),
-            ),
-          ),
-          // 좌측 중앙 이전 버튼
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: GestureDetector(
-                onTapDown: (_) => setState(() => _endPrevPressed = true),
-                onTapUp: (_) {
-                  setState(() => _endPrevPressed = false);
-                  _endPageController.previousPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                onTapCancel: () => setState(() => _endPrevPressed = false),
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: _endPrevPressed
-                        ? Colors.white.withValues(alpha: 0.25)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // 우측 중앙 다음 버튼
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: GestureDetector(
-                onTapDown: (_) => setState(() => _endNextPressed = true),
-                onTapUp: (_) {
-                  setState(() => _endNextPressed = false);
-                  _endPageController.nextPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                onTapCancel: () => setState(() => _endNextPressed = false),
-                child: Container(
-                  width: 160,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: _endNextPressed
-                        ? Colors.white.withValues(alpha: 0.25)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
                 ),
               ),
             ),

@@ -93,7 +93,7 @@ class _TestPageState extends State<TestPage> {
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final ip = _ipController.text.trim();
-    final port = int.tryParse(_portController.text.trim()) ?? 4210;
+    final port = int.tryParse(_portController.text.trim()) ?? 10025;
     final readyTimer = int.tryParse(_readyTimerController.text.trim()) ?? 120;
     final playTimer = int.tryParse(_playTimerController.text.trim()) ?? 14;
     final endTimer = int.tryParse(_endTimerController.text.trim()) ?? 120;
@@ -256,7 +256,7 @@ class _TestPageState extends State<TestPage> {
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
                             _sendUdp(UdpCommand.saveOrigin);
                             setDialogState(() => lastSignal = 'O');
                           },
@@ -455,7 +455,7 @@ class _TestPageState extends State<TestPage> {
                         flex: 1,
                         child: TextField(
                           controller: _portController,
-                          decoration: _inputDeco('포트', '4210'),
+                          decoration: _inputDeco('포트', '10025'),
                           style: const TextStyle(color: _textWhite),
                           keyboardType: TextInputType.number,
                           onSubmitted: (_) => _saveSettings(),
