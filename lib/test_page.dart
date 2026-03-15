@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import 'udp_service.dart';
+import 'udp_controller.dart';
 
 class TestPage extends StatefulWidget {
   const TestPage({super.key});
@@ -27,9 +27,10 @@ class _TestPageState extends State<TestPage> {
   // --- 네이티브 채널 (키오스크 모드용) ---
   static const _platform = MethodChannel('com.example.controller_tablet/kiosk');
 
-  String _targetIp = '192.168.240.255';
-  int _targetPort = 10025;
+  final _udp = UdpController.instance;
   String _status = '대기 중';
+  String _lastReceived = '';
+  StreamSubscription<String>? _udpSubscription;
   late TextEditingController _ipController;
   late TextEditingController _portController;
   late TextEditingController _readyTimerController;
@@ -47,12 +48,14 @@ class _TestPageState extends State<TestPage> {
   @override
   void initState() {
     super.initState();
-    _ipController = TextEditingController(text: _targetIp);
-    _portController = TextEditingController(text: _targetPort.toString());
+    _ipController = TextEditingController(text: _udp.targetIp);
+    _portController = TextEditingController(text: _udp.targetPort.toString());
     _readyTimerController = TextEditingController();
     _playTimerController = TextEditingController();
     _endTimerController = TextEditingController();
-    UdpService.warmUp(); // 소켓 미리 준비 → sendFast가 동기로 동작
+    _udpSubscription = _udp.onReceive.listen((msg) {
+      setState(() => _lastReceived = msg);
+    });
     _loadSettings();
   }
 
@@ -69,11 +72,11 @@ class _TestPageState extends State<TestPage> {
 
     setState(() {
       if (savedIp != null) {
-        _targetIp = savedIp;
+        _udp.targetIp = savedIp;
         _ipController.text = savedIp;
       }
       if (savedPort != null) {
-        _targetPort = savedPort;
+        _udp.targetPort = savedPort;
         _portController.text = savedPort.toString();
       }
       _readyTimerController.text = (readyTimer ?? 120).toString();
@@ -102,10 +105,8 @@ class _TestPageState extends State<TestPage> {
     await prefs.setInt('timer_ready', readyTimer);
     await prefs.setInt('timer_play', playTimer);
     await prefs.setInt('timer_end', endTimer);
-    setState(() {
-      _targetIp = ip;
-      _targetPort = port;
-    });
+    _udp.targetIp = ip;
+    _udp.targetPort = port;
     if (mounted) FocusScope.of(context).unfocus();
   }
 
@@ -235,7 +236,7 @@ class _TestPageState extends State<TestPage> {
                         children: [
                           _calibBtn(
                             ' 왼쪽',
-                            () => sendAndShow('R'),
+                            () => sendAndShow('L'),
                             icon: Icons.arrow_back,
                           ),
                           _calibBtn(
@@ -246,7 +247,7 @@ class _TestPageState extends State<TestPage> {
                           ),
                           _calibBtn(
                             '오른쪽 ',
-                            () => sendAndShow('L'),
+                            () => sendAndShow('R'),
                             icon: Icons.arrow_forward,
                           ),
                         ],
@@ -276,7 +277,6 @@ class _TestPageState extends State<TestPage> {
                         height: 48,
                         child: TextButton(
                           onPressed: () {
-                            _sendUdpFast(UdpCommand.stop);
                             Navigator.of(ctx).pop();
                           },
                           child: const Text(
@@ -335,12 +335,12 @@ class _TestPageState extends State<TestPage> {
 
   /// 즉시 전송 (await 없이 fire-and-forget) — 왼쪽/오른쪽/멈춤 등 반응속도 중요한 곳용
   void _sendUdpFast(String command) {
-    UdpService.sendFast(command, _targetIp, _targetPort);
+    _udp.sendFast(command);
   }
 
   Future<void> _sendUdp(String command) async {
     try {
-      await UdpService.send(command, _targetIp, _targetPort);
+      await _udp.send(command);
       setState(() {
         _status = command == 'N'
             ? '모터 ON 전송됨'
@@ -358,6 +358,7 @@ class _TestPageState extends State<TestPage> {
   @override
   void dispose() {
     _moveTimer?.cancel();
+    _udpSubscription?.cancel();
     _ipController.dispose();
     _portController.dispose();
     _readyTimerController.dispose();
@@ -415,7 +416,32 @@ class _TestPageState extends State<TestPage> {
               child: Column(
                 children: [
                   const SizedBox(height: 20),
-                  // 상태 표시
+                  // UDP 수신 표시
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _lastReceived.isEmpty
+                          ? _cardDark
+                          : Colors.blue.shade900,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _lastReceived.isEmpty
+                          ? '수신 대기 중'
+                          : '수신: $_lastReceived (${UdpCommand.nameOf(_lastReceived)})',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _lastReceived.isEmpty
+                            ? _textGray
+                            : Colors.lightBlueAccent,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // 전송 상태 표시
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -470,7 +496,7 @@ class _TestPageState extends State<TestPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '현재: $_targetIp:$_targetPort',
+                    '현재: ${_udp.targetIp}:${_udp.targetPort}',
                     style: const TextStyle(color: _textGray, fontSize: 12),
                   ),
 

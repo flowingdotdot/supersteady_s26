@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'exhibition_page.dart';
+import 'udp_controller.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  UdpController.instance.init();
   runApp(const MyApp());
 }
 

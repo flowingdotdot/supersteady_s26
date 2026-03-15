@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'test_page.dart';
-import 'udp_service.dart';
+import 'udp_controller.dart';
 import 'widgets/exit_button.dart';
 import 'widgets/page_nav_button.dart';
 
@@ -30,9 +30,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   int _playSeconds = 10;
   int _endSeconds = 10;
 
-  // UDP 전송용
-  String _targetIp = '192.168.240.255';
-  int _targetPort = 10025;
+  // UDP 컨트롤러
+  final _udp = UdpController.instance;
 
   // 네이티브 채널 (키오스크 모드용)
   static const _platform = MethodChannel('com.example.controller_tablet/kiosk');
@@ -105,8 +104,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       _readySeconds = prefs.getInt('timer_ready') ?? 120;
       _playSeconds = prefs.getInt('timer_play') ?? 14;
       _endSeconds = prefs.getInt('timer_end') ?? 120;
-      _targetIp = prefs.getString('target_ip') ?? '192.168.240.255';
-      _targetPort = prefs.getInt('target_port') ?? 10025;
+      _udp.targetIp = prefs.getString('target_ip') ?? '192.168.240.255';
+      _udp.targetPort = prefs.getInt('target_port') ?? 10025;
     });
 
     // 저장된 세팅 복원 적용
@@ -127,7 +126,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   }
 
   Future<void> _sendUdp(String command) async {
-    await UdpService.send(command, _targetIp, _targetPort);
+    await _udp.send(command);
   }
 
   void _goTo(AppState newState) {
