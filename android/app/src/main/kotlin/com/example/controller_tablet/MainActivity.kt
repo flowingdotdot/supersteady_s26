@@ -1,8 +1,6 @@
 package com.example.controller_tablet
 
-import android.app.admin.DevicePolicyManager
 import android.content.BroadcastReceiver
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -26,10 +24,6 @@ class MainActivity : FlutterActivity() {
     private var kioskActive = false
     private val handler = Handler(Looper.getMainLooper())
 
-    // =====================================================
-    // 전원 버튼으로 화면 꺼지면 즉시 다시 켜는 리시버
-    // 키오스크 모드 활성 상태에서만 동작
-    // =====================================================
     private fun isCharging(): Boolean {
         val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         return bm.isCharging
@@ -41,11 +35,6 @@ class MainActivity : FlutterActivity() {
             if (!kioskActive) return
             runOnUiThread {
                 if (isCharging()) {
-                    val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-                    val adminComponent = ComponentName(this@MainActivity, AdminReceiver::class.java)
-                    if (dpm.isDeviceOwnerApp(packageName)) {
-                        dpm.setKeyguardDisabled(adminComponent, true)
-                    }
                     window.addFlags(
                         WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
                             or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
@@ -59,14 +48,6 @@ class MainActivity : FlutterActivity() {
                             or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                             or WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
                     )
-                    val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-                    val adminComponent = ComponentName(this@MainActivity, AdminReceiver::class.java)
-                    if (dpm.isDeviceOwnerApp(packageName)) {
-                        dpm.setKeyguardDisabled(adminComponent, false)
-                    }
-                    if (dpm.isAdminActive(adminComponent)) {
-                        dpm.lockNow()
-                    }
                 }
             }
         }
@@ -75,14 +56,12 @@ class MainActivity : FlutterActivity() {
     private val screenOffReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_SCREEN_OFF && kioskActive && isCharging()) {
-                // 충전 중일 때만 화면 다시 켜기 (비충전 시 화면 꺼짐 허용)
                 handler.postDelayed({ wakeUpScreen() }, 500)
             }
         }
     }
 
     private fun wakeUpScreen() {
-        // WakeLock으로 화면 강제 켜기
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         @Suppress("DEPRECATION")
         val wl = pm.newWakeLock(
@@ -93,19 +72,16 @@ class MainActivity : FlutterActivity() {
         )
         wl.acquire(5000L)
 
-        // Activity를 앞으로 가져오기
         val intent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
         }
         startActivity(intent)
 
-        // 최신 API — Activity 레벨에서 화면 켜기
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
         }
 
-        // FLAG_KEEP_SCREEN_ON 다시 설정
         runOnUiThread {
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
@@ -115,7 +91,6 @@ class MainActivity : FlutterActivity() {
             )
         }
 
-        // 1초 후 WakeLock 해제 (화면이 켜진 뒤)
         handler.postDelayed({ wl.release() }, 1000)
     }
 
@@ -150,25 +125,13 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
 
                     // =====================================================
-                    // startKiosk: 완전한 키오스크 모드
-                    //   - startLockTask()로 홈/뒤로/최근앱 전부 차단
+                    // startKiosk: Immersive 키오스크 모드
                     //   - 시스템 바(상태바+네비바) 숨김
-                    //   - 전원 버튼 눌러도 화면 즉시 복귀
-                    //
-                    //   ※ Device Owner 필요 (USB로 한 번만):
-                    //   adb shell dpm set-device-owner com.example.controller_tablet/.AdminReceiver
+                    //   - 스와이프해도 잠시 보였다 다시 숨김
+                    //   - 충전 중 전원 버튼 눌러도 화면 즉시 복귀
                     // =====================================================
                     "startKiosk" -> {
                         try {
-                            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-                            val adminComponent = ComponentName(this, AdminReceiver::class.java)
-
-                            if (dpm.isDeviceOwnerApp(packageName)) {
-                                dpm.setLockTaskPackages(adminComponent, arrayOf(packageName))
-                                dpm.setKeyguardDisabled(adminComponent, true)
-                            }
-
-                            startLockTask()
                             hideSystemUI()
                             kioskActive = true
 
@@ -185,21 +148,11 @@ class MainActivity : FlutterActivity() {
                     }
 
                     // =====================================================
-                    // stopKiosk: 키오스크 완전 해제
-                    // Device Owner 모드에서는 알림/팝업 없이 해제됨
+                    // stopKiosk: 키오스크 해제
                     // =====================================================
                     "stopKiosk" -> {
                         try {
                             kioskActive = false
-
-                            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-                            val adminComponent = ComponentName(this, AdminReceiver::class.java)
-
-                            if (dpm.isDeviceOwnerApp(packageName)) {
-                                dpm.setKeyguardDisabled(adminComponent, false)
-                            }
-
-                            stopLockTask()
                             showSystemUI()
 
                             window.clearFlags(
@@ -211,31 +164,6 @@ class MainActivity : FlutterActivity() {
                             result.success(true)
                         } catch (e: Exception) {
                             result.error("KIOSK_ERROR", e.message, null)
-                        }
-                    }
-
-                    // =====================================================
-                    // isDeviceOwner: Device Owner 등록 여부 확인
-                    // =====================================================
-                    "isDeviceOwner" -> {
-                        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-                        result.success(dpm.isDeviceOwnerApp(packageName))
-                    }
-
-                    // =====================================================
-                    // clearDeviceOwner: Device Owner 해제
-                    // =====================================================
-                    "clearDeviceOwner" -> {
-                        try {
-                            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-                            if (dpm.isDeviceOwnerApp(packageName)) {
-                                dpm.clearDeviceOwnerApp(packageName)
-                                result.success(true)
-                            } else {
-                                result.success(false)
-                            }
-                        } catch (e: Exception) {
-                            result.error("CLEAR_OWNER_ERROR", e.message, null)
                         }
                     }
 
