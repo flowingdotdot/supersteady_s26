@@ -47,9 +47,13 @@ class UdpController {
 
   RawDatagramSocket? _socket;
   final _receiveController = StreamController<String>.broadcast();
+  final _sendController = StreamController<String>.broadcast();
 
   /// 수신된 UDP 메시지 스트림
   Stream<String> get onReceive => _receiveController.stream;
+
+  /// 송신된 UDP 메시지 스트림
+  Stream<String> get onSend => _sendController.stream;
 
   static final instance = UdpController._();
 
@@ -83,6 +87,7 @@ class UdpController {
     final name = _commandNames[command] ?? command;
     final hex = '0x${command.codeUnitAt(0).toRadixString(16).toUpperCase()}';
     debugPrint('UDP 전송: \'$command\' ($hex) $name → $targetIp:$targetPort');
+    _sendController.add(command);
     try {
       final socket = await _getSocket();
       final data = utf8.encode(command);
@@ -99,6 +104,7 @@ class UdpController {
 
   /// 즉시 단일 패킷 전송 — 반응속도가 최우선인 곳용
   void sendFast(String command) {
+    _sendController.add(command);
     final socket = _socket;
     if (socket == null) {
       _getSocket()
@@ -142,5 +148,6 @@ class UdpController {
     _socket?.close();
     _socket = null;
     _receiveController.close();
+    _sendController.close();
   }
 }

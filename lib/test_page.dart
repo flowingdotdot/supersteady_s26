@@ -41,6 +41,7 @@ class _TestPageState extends State<TestPage> {
   bool _kioskMode = false;
   bool _landscapeMode = false;
   bool _wakeLock = false;
+  bool _debugMode = false;
 
   // --- 이동 버튼 반복 전송용 ---
   Timer? _moveTimer;
@@ -69,6 +70,7 @@ class _TestPageState extends State<TestPage> {
     final kiosk = prefs.getBool('kiosk_mode') ?? false;
     final landscape = prefs.getBool('landscape_mode') ?? false;
     final wake = prefs.getBool('wake_lock') ?? false;
+    final debug = prefs.getBool('debug_mode') ?? false;
 
     setState(() {
       if (savedIp != null) {
@@ -85,6 +87,7 @@ class _TestPageState extends State<TestPage> {
       _kioskMode = kiosk;
       _landscapeMode = landscape;
       _wakeLock = wake;
+      _debugMode = debug;
     });
 
     // 저장된 상태 복원 적용
@@ -156,6 +159,12 @@ class _TestPageState extends State<TestPage> {
     await prefs.setBool('wake_lock', value);
     setState(() => _wakeLock = value);
     await _setWakeLock(value);
+  }
+
+  Future<void> _toggleDebugMode(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('debug_mode', value);
+    setState(() => _debugMode = value);
   }
 
   Future<void> _openAppSettings() async {
@@ -258,8 +267,9 @@ class _TestPageState extends State<TestPage> {
                         height: 48,
                         child: ElevatedButton(
                           onPressed: () async {
-                            _sendUdp(UdpCommand.saveOrigin);
+                            await _sendUdp(UdpCommand.saveOrigin);
                             setDialogState(() => lastSignal = 'O');
+                            Navigator.of(ctx).pop();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _green,
@@ -645,6 +655,12 @@ class _TestPageState extends State<TestPage> {
                     '화면이 절대 꺼지지 않음',
                     _wakeLock,
                     _toggleWakeLock,
+                  ),
+                  _settingTile(
+                    '디버그 모드',
+                    '전시화면에 상태/타이머/UDP 정보 표시',
+                    _debugMode,
+                    _toggleDebugMode,
                   ),
                   const SizedBox(height: 8),
                   ListTile(

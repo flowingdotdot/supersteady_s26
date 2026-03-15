@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'exhibition_page.dart';
 import 'udp_controller.dart';
+import 'widgets/debug_overlay.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home: const ExhibitionPage(),
+      builder: (context, child) => DebugOverlay(child: child!),
     );
   }
 }
