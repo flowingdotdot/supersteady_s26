@@ -208,6 +208,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _udp.dispose();
     _pageController.dispose();
     _readyPageController.dispose();
     _endPageController.dispose();
@@ -301,12 +302,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                   ),
                   child: i == readyImages.length - 1
                       ? Align(
-                          alignment: Alignment.bottomLeft,
+                          alignment: Alignment.bottomCenter,
                           child: Padding(
-                            padding: const EdgeInsets.only(
-                              left: 114,
-                              bottom: 98,
-                            ),
+                            padding: const EdgeInsets.only(bottom: 60),
                             child: Listener(
                               onPointerDown: (_) async {
                                 setState(() => _readyStartPressed = true);
@@ -324,6 +322,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                                   color: _readyStartPressed
                                       ? Colors.white.withValues(alpha: 0.25)
                                       : Colors.transparent,
+                                  // border: Border.all(
+                                  //   color: Colors.black.withValues(alpha: 0.5),
+                                  // ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
