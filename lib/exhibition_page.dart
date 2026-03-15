@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'page_nav_button.dart';
 import 'test_page.dart';
 import 'udp_service.dart';
 
@@ -37,16 +38,26 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
-    AssetImage('assets/images/h1_idle.png'),
-    AssetImage('assets/images/h2_ready.png'),
-    AssetImage('assets/images/h3_ready.png'),
-    AssetImage('assets/images/h4_ready.png'),
-    AssetImage('assets/images/h5_ready.png'),
-    AssetImage('assets/images/h6_ready.png'),
-    AssetImage('assets/images/h7_play.png'),
-    AssetImage('assets/images/h8_end.png'),
-    AssetImage('assets/images/h9_end.png'),
-    AssetImage('assets/images/h10_end.png'),
+    // AssetImage('assets/images/h1_idle.png'),
+    // AssetImage('assets/images/h2_ready.png'),
+    // AssetImage('assets/images/h3_ready.png'),
+    // AssetImage('assets/images/h4_ready.png'),
+    // AssetImage('assets/images/h5_ready.png'),
+    // AssetImage('assets/images/h6_ready.png'),
+    // AssetImage('assets/images/h7_play.png'),
+    // AssetImage('assets/images/h8_end.png'),
+    // AssetImage('assets/images/h9_end.png'),
+    // AssetImage('assets/images/h10_end.png'),
+    AssetImage('assets/images/p2_1_idle.png'),
+    AssetImage('assets/images/p2_2_ready.png'),
+    AssetImage('assets/images/p2_3_ready.png'),
+    AssetImage('assets/images/p2_4_ready.png'),
+    AssetImage('assets/images/p2_5_ready.png'),
+    AssetImage('assets/images/p2_6_ready.png'),
+    AssetImage('assets/images/p2_7_play.png'),
+    AssetImage('assets/images/p2_8_end.png'),
+    AssetImage('assets/images/p2_9_end.png'),
+    AssetImage('assets/images/p2_10_end.png'),
   ];
 
   // 이미지 로딩 완료 여부
@@ -60,13 +71,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   bool _idlePressed = false;
   bool _readyExitPressed = false;
   bool _readyStartPressed = false;
-  bool _readyPrevPressed = false;
-  bool _readyNextPressed = false;
   bool _playExitPressed = false;
-  bool _playNextPressed = false;
   bool _endExitPressed = false;
-  bool _endPrevPressed = false;
-  bool _endNextPressed = false;
   bool _endHomePressed = false;
 
   // Play 타이머 만료 여부 (만료 전까지 다음 버튼 비활성화)
@@ -332,61 +338,19 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             ],
           ),
           // 좌측 중앙 이전 버튼
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: GestureDetector(
-                onTapDown: (_) => setState(() => _readyPrevPressed = true),
-                onTapUp: (_) {
-                  setState(() => _readyPrevPressed = false);
-                  _readyPageController.previousPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                onTapCancel: () => setState(() => _readyPrevPressed = false),
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: _readyPrevPressed
-                        ? Colors.white.withValues(alpha: 0.25)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
+          PageNavButton(
+            isLeft: true,
+            onTap: () => _readyPageController.previousPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
             ),
           ),
           // 우측 중앙 다음 버튼
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: GestureDetector(
-                onTapDown: (_) => setState(() => _readyNextPressed = true),
-                onTapUp: (_) {
-                  setState(() => _readyNextPressed = false);
-                  _readyPageController.nextPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                onTapCancel: () => setState(() => _readyNextPressed = false),
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: _readyNextPressed
-                        ? Colors.white.withValues(alpha: 0.25)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
+          PageNavButton(
+            isLeft: false,
+            onTap: () => _readyPageController.nextPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
             ),
           ),
           // 우측 상단 IDLE 복귀 버튼
@@ -452,31 +416,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           ),
           // 우측 중앙 다음(END) 버튼 — 타이머 만료 후에만 활성화
           if (_playTimerExpired)
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: GestureDetector(
-                  onTapDown: (_) => setState(() => _playNextPressed = true),
-                  onTapUp: (_) {
-                    setState(() => _playNextPressed = false);
-                    _goTo(AppState.end);
-                  },
-                  onTapCancel: () => setState(() => _playNextPressed = false),
-                  child: Container(
-                    width: 160,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: _playNextPressed
-                          ? Colors.white.withValues(alpha: 0.25)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            PageNavButton(isLeft: false, onTap: () => _goTo(AppState.end)),
         ],
       ),
     );
@@ -559,61 +499,19 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             ),
           ),
           // 좌측 중앙 이전 버튼
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: GestureDetector(
-                onTapDown: (_) => setState(() => _endPrevPressed = true),
-                onTapUp: (_) {
-                  setState(() => _endPrevPressed = false);
-                  _endPageController.previousPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                onTapCancel: () => setState(() => _endPrevPressed = false),
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: _endPrevPressed
-                        ? Colors.white.withValues(alpha: 0.25)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
+          PageNavButton(
+            isLeft: true,
+            onTap: () => _endPageController.previousPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
             ),
           ),
           // 우측 중앙 다음 버튼
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: GestureDetector(
-                onTapDown: (_) => setState(() => _endNextPressed = true),
-                onTapUp: (_) {
-                  setState(() => _endNextPressed = false);
-                  _endPageController.nextPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                onTapCancel: () => setState(() => _endNextPressed = false),
-                child: Container(
-                  width: 160,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: _endNextPressed
-                        ? Colors.white.withValues(alpha: 0.25)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
+          PageNavButton(
+            isLeft: false,
+            onTap: () => _endPageController.nextPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
             ),
           ),
         ],
