@@ -5,9 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import 'page_nav_button.dart';
 import 'test_page.dart';
 import 'udp_service.dart';
+import 'widgets/exit_button.dart';
+import 'widgets/page_nav_button.dart';
 
 enum AppState { idle, ready, play, end }
 
@@ -69,10 +70,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 버튼 탭 피드백
   bool _idlePressed = false;
-  bool _readyExitPressed = false;
   bool _readyStartPressed = false;
-  bool _playExitPressed = false;
-  bool _endExitPressed = false;
   bool _endHomePressed = false;
 
   // Play 타이머 만료 여부 (만료 전까지 다음 버튼 비활성화)
@@ -354,28 +352,11 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             ),
           ),
           // 우측 상단 IDLE 복귀 버튼
-          Positioned(
-            top: 32,
-            right: 32,
-            child: GestureDetector(
-              onTapDown: (_) => setState(() => _readyExitPressed = true),
-              onTapUp: (_) async {
-                setState(() => _readyExitPressed = false);
-                await _sendUdp('I');
-                _goTo(AppState.idle);
-              },
-              onTapCancel: () => setState(() => _readyExitPressed = false),
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: _readyExitPressed
-                      ? Colors.white.withValues(alpha: 0.25)
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
+          ExitButton(
+            onTap: () async {
+              await _sendUdp('I');
+              _goTo(AppState.idle);
+            },
           ),
         ],
       ),
@@ -391,28 +372,11 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       child: Stack(
         children: [
           // 우측 상단 IDLE 복귀 버튼
-          Positioned(
-            top: 32,
-            right: 32,
-            child: Listener(
-              onPointerDown: (_) async {
-                setState(() => _playExitPressed = true);
-                await _sendUdp('F');
-                _goTo(AppState.idle);
-              },
-              onPointerUp: (_) => setState(() => _playExitPressed = false),
-              onPointerCancel: (_) => setState(() => _playExitPressed = false),
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: _playExitPressed
-                      ? Colors.white.withValues(alpha: 0.25)
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
+          ExitButton(
+            onTap: () async {
+              await _sendUdp('F');
+              _goTo(AppState.idle);
+            },
           ),
           // 우측 중앙 다음(END) 버튼 — 타이머 만료 후에만 활성화
           if (_playTimerExpired)
@@ -475,28 +439,11 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             ],
           ),
           // 우측 상단 IDLE 복귀 버튼
-          Positioned(
-            top: 32,
-            right: 32,
-            child: GestureDetector(
-              onTapDown: (_) => setState(() => _endExitPressed = true),
-              onTapUp: (_) async {
-                setState(() => _endExitPressed = false);
-                await _sendUdp('I');
-                _goTo(AppState.idle);
-              },
-              onTapCancel: () => setState(() => _endExitPressed = false),
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: _endExitPressed
-                      ? Colors.white.withValues(alpha: 0.25)
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
+          ExitButton(
+            onTap: () async {
+              await _sendUdp('I');
+              _goTo(AppState.idle);
+            },
           ),
           // 좌측 중앙 이전 버튼
           PageNavButton(
