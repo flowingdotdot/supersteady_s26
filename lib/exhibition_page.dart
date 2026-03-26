@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'motor_controller.dart';
 import 'test_page.dart';
 import 'udp_controller.dart';
 import 'widgets/exit_button.dart';
@@ -32,6 +33,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // UDP 컨트롤러
   final _udp = UdpController.instance;
+  final _motor = MotorController.instance;
 
   // 네이티브 채널 (키오스크 모드용)
   static const _platform = MethodChannel('com.example.controller_tablet/kiosk');
@@ -127,6 +129,16 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   Future<void> _sendUdp(String command) async {
     await _udp.send(command);
+    // 바이너리 프레임도 함께 전송 (모터드라이버 직접 통신용)
+    switch (command) {
+      case 'N': await _motor.motorOn(); break;
+      case 'F': await _motor.motorOff(); break;
+      case 'I': await _motor.reset(); break;
+      case 'R': await _motor.moveRight(); break;
+      case 'L': await _motor.moveLeft(); break;
+      case 'S': await _motor.stop(); break;
+      case 'O': await _motor.saveOrigin(); break;
+    }
   }
 
   void _goTo(AppState newState) {

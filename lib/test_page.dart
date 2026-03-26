@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'motor_controller.dart';
 import 'udp_controller.dart';
 
 class TestPage extends StatefulWidget {
@@ -28,6 +29,7 @@ class _TestPageState extends State<TestPage> {
   static const _platform = MethodChannel('com.example.controller_tablet/kiosk');
 
   final _udp = UdpController.instance;
+  final _motor = MotorController.instance;
   String _status = '대기 중';
   String _lastReceived = '';
   StreamSubscription<String>? _udpSubscription;
@@ -346,11 +348,24 @@ class _TestPageState extends State<TestPage> {
   /// 즉시 전송 (await 없이 fire-and-forget) — 왼쪽/오른쪽/멈춤 등 반응속도 중요한 곳용
   void _sendUdpFast(String command) {
     _udp.sendFast(command);
+    // 바이너리 프레임도 함께 전송
+    switch (command) {
+      case 'R': _motor.moveRight(); break;
+      case 'L': _motor.moveLeft(); break;
+      case 'S': _motor.stop(); break;
+    }
   }
 
   Future<void> _sendUdp(String command) async {
     try {
       await _udp.send(command);
+      // 바이너리 프레임도 함께 전송
+      switch (command) {
+        case 'N': await _motor.motorOn(); break;
+        case 'F': await _motor.motorOff(); break;
+        case 'I': await _motor.reset(); break;
+        case 'O': await _motor.saveOrigin(); break;
+      }
       setState(() {
         _status = command == 'N'
             ? '모터 ON 전송됨'

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 
 class UdpCommand {
@@ -139,6 +138,22 @@ class UdpController {
       debugPrint('UDP fast 전송 실패 (네트워크 없음): $e');
     } catch (e) {
       debugPrint('UDP fast 전송 실패: $e');
+      _socket?.close();
+      _socket = null;
+    }
+  }
+
+  /// 바이너리 프레임 전송 — 모터드라이버 직접 통신용
+  Future<void> sendBytes(Uint8List data) async {
+    final hex = data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    debugPrint('UDP sendBytes → $targetIp:$targetPort [${data.length}B] $hex');
+    try {
+      final socket = await _getSocket();
+      socket.send(data, InternetAddress(targetIp), targetPort);
+    } on SocketException catch (e) {
+      debugPrint('UDP sendBytes 실패 (네트워크 없음): $e');
+    } catch (e) {
+      debugPrint('UDP sendBytes 실패: $e');
       _socket?.close();
       _socket = null;
     }
