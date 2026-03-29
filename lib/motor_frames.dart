@@ -4,7 +4,6 @@ import 'dart:typed_data';
 /// Arduino esp32s3_uniservo.ino 코드와 동일한 프레임 구조입니다.
 class MotorFrames {
   static int _seq = 1;
-  static const int _axis = 0x00;
 
   static int _nextSeq() {
     final s = _seq & 0xFFFF;
@@ -13,14 +12,14 @@ class MotorFrames {
     return s;
   }
 
-  static void _header(Uint8List f, int seq, int opId) {
+  static void _header(Uint8List f, int seq, int opId, int axis) {
     f[2] = 0xF1;
     f[3] = 0xF2;
     f[4] = (seq >> 8) & 0xFF;
     f[5] = seq & 0xFF;
     f[8] = 0x10; // Write Mode
     f[9] = opId;
-    f[10] = _axis;
+    f[10] = axis;
   }
 
   /// int32 값을 빅엔디안으로 기록 (음수 포함)
@@ -35,74 +34,86 @@ class MotorFrames {
   // ── ID 8: 세션 초기화 ──────────────────────
   static Uint8List init() {
     return Uint8List.fromList([
-      0x00, 0x00, 0xF1, 0xF2,
-      0x00, 0x00, 0x00, 0x00,
-      0x00, 0x08, 0xFF, 0x00,
-      0x00, 0x00, 0x00, 0x01,
+      0x00,
+      0x00,
+      0xF1,
+      0xF2,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x08,
+      0xFF,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x01,
     ]);
   }
 
   // ── ID 50: 드라이브 알람 리셋 ───────────────
-  static Uint8List resetDrive() {
+  static Uint8List resetDrive(int axis) {
     final f = Uint8List(20);
-    _header(f, _nextSeq(), 50);
+    _header(f, _nextSeq(), 50, axis);
     f[15] = 0x01;
     return f;
   }
 
   // ── ID 51: 감속 정지 (SlowStop) ─────────────
-  static Uint8List moveStop() {
+  static Uint8List moveStop(int axis) {
     final f = Uint8List(20);
-    _header(f, _nextSeq(), 51);
+    _header(f, _nextSeq(), 51, axis);
     f[15] = 0x01;
-    f[19] = 200;
+    f[19] = 300;
     return f;
   }
 
   // ── ID 63: 원점 설정 (Actual Position Clear) ─
-  static Uint8List setOrigin() {
+  static Uint8List setOrigin(int axis) {
     final f = Uint8List(20);
-    _header(f, _nextSeq(), 63);
+    _header(f, _nextSeq(), 63, axis);
     f[15] = 0x01;
     return f;
   }
 
   // ── ID 73: 서보 ON/OFF ──────────────────────
-  static Uint8List servoCommand(bool on) {
+  static Uint8List servoCommand(int axis, bool on) {
     final f = Uint8List(20);
-    _header(f, _nextSeq(), 73);
+    _header(f, _nextSeq(), 73, axis);
     f[15] = 0x01;
     f[19] = on ? 1 : 0;
     return f;
   }
 
   // ── ID 20: 절대 이송 ────────────────────────
-  static Uint8List moveAbsolute(int targetPos, int velocity) {
+  static Uint8List moveAbsolute(int axis, int targetPos, int velocity) {
     final f = Uint8List(60);
-    _header(f, _nextSeq(), 20);
+    _header(f, _nextSeq(), 20, axis);
     f[15] = 11;
     void d(int i, int v) => _i32(f, 16 + i * 4, v);
-    d(0, 3);         // S-curve 가감속
+    d(0, 3); // S-curve 가감속
     d(1, velocity);
-    d(2, 300);       // 가속 시간
-    d(3, 300);       // 감속 시간
-    d(4, 60);        // Jerk Accel
-    d(5, 60);        // Jerk Decel
+    d(2, 300); // 가속 시간
+    d(3, 300); // 감속 시간
+    d(4, 60); // Jerk Accel
+    d(5, 60); // Jerk Decel
     d(6, targetPos);
     d(7, 0);
     d(8, 0);
     d(9, 0);
-    d(10, 0);        // 0: 절대 이송
+    d(10, 0); // 0: 절대 이송
     return f;
   }
 
   // ── ID 20: Jog 이송 ─────────────────────────
-  static Uint8List moveJog(bool direction) {
+  static Uint8List moveJog(int axis, bool direction) {
     final f = Uint8List(60);
-    _header(f, _nextSeq(), 20);
+    _header(f, _nextSeq(), 20, axis);
     f[15] = 11;
     void d(int i, int v) => _i32(f, 16 + i * 4, v);
-    d(0, 5);                  // Jog 이송
+    d(0, 5); // Jog 이송
     d(1, 10);
     d(2, 300);
     d(3, 300);
@@ -119,9 +130,14 @@ class MotorFrames {
   // ── ID 140: 반복 이송 조건 설정 ─────────────
   // addr: 0=지점A, 1=지점B
   static Uint8List setRepeatPosition(
-      int addr, int pos, int velocity, int waitTime) {
+    int axis,
+    int addr,
+    int pos,
+    int velocity,
+    int waitTime,
+  ) {
     final f = Uint8List(60);
-    _header(f, _nextSeq(), 140);
+    _header(f, _nextSeq(), 140, axis);
     // addr → 11~14번 바이트
     f[11] = (addr >> 24) & 0xFF;
     f[12] = (addr >> 16) & 0xFF;
@@ -129,10 +145,10 @@ class MotorFrames {
     f[14] = addr & 0xFF;
     f[15] = 11;
     void d(int i, int v) => _i32(f, 16 + i * 4, v);
-    d(0, 1);         // 위치정보 활성화
-    d(1, 1);         // Absolute 이송
-    d(2, 0);         // In-position 확인
-    d(3, 0);         // 사다리꼴 가감속
+    d(0, 1); // 위치정보 활성화
+    d(1, 1); // Absolute 이송
+    d(2, 0); // In-position 확인
+    d(3, 0); // 사다리꼴 가감속
     d(4, pos);
     d(5, velocity);
     d(6, 300);
@@ -144,12 +160,23 @@ class MotorFrames {
   }
 
   // ── ID 141: 반복 이송 실행/정지 ─────────────
-  static Uint8List controlRepeatMove(bool start, int repeatCount) {
+  static Uint8List controlRepeatMove(int axis, bool start, int repeatCount) {
     final f = Uint8List(24);
-    _header(f, _nextSeq(), 141);
+    _header(f, _nextSeq(), 141, axis);
     f[15] = 2;
     f[19] = start ? 1 : 0;
     _i32(f, 20, repeatCount);
+    return f;
+  }
+
+  // ── ID 0x42(66): 축 동기화 설정 ─────────────
+  // masterAxis가 움직이면 slaveAxis가 동기화되어 함께 움직임
+  static Uint8List setSyncAxis(int masterAxis, int slaveAxis, bool enable) {
+    final f = Uint8List(24);
+    _header(f, _nextSeq(), 0x42, masterAxis);
+    f[15] = 0x02; // Data 2개
+    f[19] = enable ? 1 : 0; // Data 0: Sync Enable
+    f[23] = slaveAxis; // Data 1: Slave Axis Number
     return f;
   }
 }

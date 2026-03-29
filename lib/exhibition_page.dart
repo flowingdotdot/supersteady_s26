@@ -85,6 +85,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   void initState() {
     super.initState();
     _loadTimerSettings();
+    _sendUdp('N');
   }
 
   @override
@@ -104,7 +105,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _readySeconds = prefs.getInt('timer_ready') ?? 120;
-      _playSeconds = prefs.getInt('timer_play') ?? 14;
+      _playSeconds = prefs.getInt('timer_play') ?? 13;
       _endSeconds = prefs.getInt('timer_end') ?? 120;
       _udp.targetIp = prefs.getString('target_ip') ?? '192.168.240.255';
       _udp.targetPort = prefs.getInt('target_port') ?? 10025;
@@ -131,13 +132,27 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     await _udp.send(command);
     // 바이너리 프레임도 함께 전송 (모터드라이버 직접 통신용)
     switch (command) {
-      case 'N': await _motor.motorOn(); break;
-      case 'F': await _motor.motorOff(); break;
-      case 'I': await _motor.reset(); break;
-      case 'R': await _motor.moveRight(); break;
-      case 'L': await _motor.moveLeft(); break;
-      case 'S': await _motor.stop(); break;
-      case 'O': await _motor.saveOrigin(); break;
+      case 'N':
+        await _motor.motorOn();
+        break;
+      case 'F':
+        await _motor.motorOff();
+        break;
+      case 'I':
+        await _motor.reset();
+        break;
+      case 'R':
+        await _motor.moveRight();
+        break;
+      case 'L':
+        await _motor.moveLeft();
+        break;
+      case 'S':
+        await _motor.stop();
+        break;
+      case 'O':
+        await _motor.saveOrigin();
+        break;
     }
   }
 

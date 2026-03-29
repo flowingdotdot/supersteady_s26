@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'exhibition_page.dart';
+import 'motor_controller.dart';
 import 'udp_controller.dart';
 import 'widgets/debug_overlay.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  UdpController.instance.init();
+  await UdpController.instance.init();
+  await MotorController.instance.setup();
   runApp(const MyApp());
 }
 
