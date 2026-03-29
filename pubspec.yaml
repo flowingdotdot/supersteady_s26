@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.5.4
   wakelock_plus: ^1.2.8
+  video_player: ^2.5.1
 
 dev_dependencies:
   flutter_test:
@@ -62,6 +63,9 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/icon/
+    - assets/images/survey/4_1/
+    - assets/videos/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

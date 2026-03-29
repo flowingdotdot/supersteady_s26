@@ -14,8 +14,10 @@ class _ExitButtonState extends State<ExitButton> {
 
   @override
   Widget build(BuildContext context) {
+    const _imagePath = 'assets/images/icon/home_btn.png';
+
     return Positioned(
-      top: 32,
+      top: 40,
       right: 32,
       child: GestureDetector(
         onTapDown: (_) => setState(() => _pressed = true),
@@ -24,15 +26,9 @@ class _ExitButtonState extends State<ExitButton> {
           widget.onTap();
         },
         onTapCancel: () => setState(() => _pressed = false),
-        child: Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: _pressed
-                ? Colors.white.withValues(alpha: 0.25)
-                : Colors.transparent,
-            shape: BoxShape.circle,
-          ),
+        child: Opacity(
+          opacity: _pressed ? 0.6 : 1.0,
+          child: Image.asset(_imagePath, width: 70, height: 70),
         ),
       ),
     );

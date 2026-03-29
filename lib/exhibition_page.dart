@@ -4,14 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:video_player/video_player.dart';
 
 import 'motor_controller.dart';
 import 'test_page.dart';
 import 'udp_controller.dart';
 import 'widgets/exit_button.dart';
+import 'widgets/idle_button.dart';
 import 'widgets/page_nav_button.dart';
+import 'widgets/start_button.dart';
 
-enum AppState { idle, ready, play, end }
+enum AppState { idle, ready, play, end, survey }
 
 class ExhibitionPage extends StatefulWidget {
   const ExhibitionPage({super.key});
@@ -30,6 +33,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   int _readySeconds = 10;
   int _playSeconds = 10;
   int _endSeconds = 10;
+  int _surveySeconds = 10;
 
   // UDP 컨트롤러
   final _udp = UdpController.instance;
@@ -40,42 +44,29 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
-    // AssetImage('assets/images/h1_idle.png'),
-    // AssetImage('assets/images/h2_ready.png'),
-    // AssetImage('assets/images/h3_ready.png'),
-    // AssetImage('assets/images/h4_ready.png'),
-    // AssetImage('assets/images/h5_ready.png'),
-    // AssetImage('assets/images/h6_ready.png'),
-    // AssetImage('assets/images/h7_play.png'),
-    // AssetImage('assets/images/h8_end.png'),
-    // AssetImage('assets/images/h9_end.png'),
-    // AssetImage('assets/images/h10_end.png'),
-    AssetImage('assets/images/p2_1_idle.png'),
-    AssetImage('assets/images/p2_2_ready.png'),
-    AssetImage('assets/images/p2_3_ready.png'),
-    AssetImage('assets/images/p2_4_ready.png'),
-    AssetImage('assets/images/p2_5_ready.png'),
-    AssetImage('assets/images/p2_6_ready.png'),
-    AssetImage('assets/images/p2_7_play.png'),
-    AssetImage('assets/images/p2_8_end.png'),
-    AssetImage('assets/images/p2_9_end.png'),
-    AssetImage('assets/images/p2_10_end.png'),
+    AssetImage('assets/images/survey/4_1/1_1.jpg'),
+    AssetImage('assets/images/survey/4_1/1_2.png'),
   ];
-
   // 이미지 로딩 완료 여부
   bool _imagesLoaded = false;
 
   // 슬라이드 컨트롤러
-  final PageController _readyPageController = PageController();
-  final PageController _endPageController = PageController();
+  final PageController _surveyPageController = PageController();
 
-  // 버튼 탭 피드백
-  bool _idlePressed = false;
-  bool _readyStartPressed = false;
-  bool _endHomePressed = false;
+  // 영상 컨트롤러
+  late VideoPlayerController _idleVideoController;
+  late VideoPlayerController _readyVideoController;
+  late VideoPlayerController _playVideoController;
+  late VideoPlayerController _endVideoController;
 
   // Play 타이머 만료 여부 (만료 전까지 다음 버튼 비활성화)
   bool _playTimerExpired = false;
+
+  // Ready 영상 1회 재생 완료 여부 (완료 후 시작 버튼 표시)
+  bool _readyButtonVisible = false;
+
+  // _goTo 중복 호출 방지
+  bool _navigating = false;
 
   // 숨겨진 관리자 진입용
   int _tapCount = 0;
@@ -85,7 +76,56 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   void initState() {
     super.initState();
     _loadTimerSettings();
-    _sendUdp('N');
+    _initVideos();
+    _motor.setup();
+  }
+
+  Future<void> _initVideos() async {
+    final controllers = [
+      _idleVideoController = VideoPlayerController.asset(
+        'assets/videos/idle_p1.mp4',
+      ),
+      _readyVideoController = VideoPlayerController.asset(
+        'assets/videos/ready_p1.mp4',
+      ),
+      _playVideoController = VideoPlayerController.asset(
+        'assets/videos/play_p1.mp4',
+      ),
+      _endVideoController = VideoPlayerController.asset(
+        'assets/videos/end_p1.mp4',
+      ),
+    ];
+    await Future.wait(controllers.map((c) => c.initialize()));
+    for (final c in controllers) {
+      c.setLooping(true);
+    }
+    _readyVideoController.addListener(_onReadyVideoEnd);
+    _playVideoController.addListener(_onPlayVideoEnd);
+    _idleVideoController.play();
+    if (mounted) setState(() {});
+  }
+
+  void _onPlayVideoEnd() {
+    if (_navigating) return;
+    final v = _playVideoController.value;
+    if (!v.isInitialized || v.isPlaying) return;
+    final remaining = v.duration - v.position;
+    if (remaining < const Duration(milliseconds: 300) &&
+        _state == AppState.play) {
+      _sendUdp('F').then((_) {
+        if (mounted) _goTo(AppState.end);
+      });
+    }
+  }
+
+  void _onReadyVideoEnd() {
+    final v = _readyVideoController.value;
+    if (!v.isInitialized || v.isPlaying) return;
+    if (v.position >= v.duration && !_readyButtonVisible) {
+      if (mounted) setState(() => _readyButtonVisible = true);
+      _readyVideoController.setLooping(true);
+      _readyVideoController.play();
+    }
   }
 
   @override
@@ -97,7 +137,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   }
 
   Future<void> _precacheAllImages() async {
-    await Future.wait(_allImages.map((img) => precacheImage(img, context)));
+    await Future.wait(
+      _allImages.map((img) => precacheImage(img, context).catchError((_) {})),
+    );
     if (mounted) setState(() => _imagesLoaded = true);
   }
 
@@ -105,8 +147,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _readySeconds = prefs.getInt('timer_ready') ?? 120;
-      _playSeconds = prefs.getInt('timer_play') ?? 13;
+      _playSeconds = prefs.getInt('timer_play') ?? 15;
       _endSeconds = prefs.getInt('timer_end') ?? 120;
+      _surveySeconds = prefs.getInt('timer_survey') ?? 120;
       _udp.targetIp = prefs.getString('target_ip') ?? '192.168.240.255';
       _udp.targetPort = prefs.getInt('target_port') ?? 10025;
     });
@@ -156,12 +199,44 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     }
   }
 
-  void _goTo(AppState newState) {
+  Future<void> _goTo(AppState newState) async {
+    if (_navigating) return;
+    _navigating = true;
     _timer?.cancel();
+    _timer = null;
     setState(() {
       _state = newState;
       if (newState == AppState.play) _playTimerExpired = false;
     });
+
+    // 영상 재생 제어
+    if (newState == AppState.ready) {
+      setState(() => _readyButtonVisible = false);
+      _readyVideoController.setLooping(false);
+    }
+    switch (newState) {
+      case AppState.idle:
+        await _idleVideoController.seekTo(Duration.zero);
+        _idleVideoController.play();
+        break;
+      case AppState.ready:
+        await _readyVideoController.seekTo(Duration.zero);
+        _readyVideoController.play();
+        break;
+      case AppState.play:
+        _playVideoController.setLooping(false);
+        await _playVideoController.seekTo(Duration.zero);
+        _playVideoController.play();
+        break;
+      case AppState.end:
+        await _endVideoController.seekTo(Duration.zero);
+        _endVideoController.play();
+        break;
+      case AppState.survey: // 설문 페이지 진입 시 END 영상 정지
+        _endVideoController.pause();
+        break;
+    }
+
     _pageController.animateToPage(
       newState.index,
       duration: const Duration(milliseconds: 400),
@@ -174,6 +249,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         AppState.ready => _readySeconds,
         AppState.play => _playSeconds,
         AppState.end => _endSeconds,
+        AppState.survey => _surveySeconds,
         _ => 10,
       };
 
@@ -182,6 +258,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         setState(() => _remaining--);
         if (_remaining <= 0) {
           t.cancel();
+          _timer = null;
           if (_state == AppState.play) {
             _sendUdp('F');
             setState(() => _playTimerExpired = true);
@@ -191,15 +268,17 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         }
       });
     }
+    _navigating = false;
   }
 
   void _resetTimer() {
-    if (_state == AppState.idle) return;
+    if (_state == AppState.idle || _state == AppState.play) return;
     _timer?.cancel();
     final seconds = switch (_state) {
       AppState.ready => _readySeconds,
       AppState.play => _playSeconds,
       AppState.end => _endSeconds,
+      AppState.survey => _surveySeconds,
       _ => 10,
     };
     setState(() => _remaining = seconds);
@@ -237,8 +316,11 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _timer?.cancel();
     _udp.dispose();
     _pageController.dispose();
-    _readyPageController.dispose();
-    _endPageController.dispose();
+    _surveyPageController.dispose();
+    _idleVideoController.dispose();
+    _readyVideoController.dispose();
+    _playVideoController.dispose();
+    _endVideoController.dispose();
     super.dispose();
   }
 
@@ -257,6 +339,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                     _buildReadyPage(),
                     _buildPlayPage(),
                     _buildEndPage(),
+                    _buildSurveyPage(),
                   ],
                 ),
                 // 좌측 상단 숨겨진 영역 — 8번 탭하면 테스트 페이지
@@ -277,115 +360,85 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // === IDLE 화면 ===
   Widget _buildIdlePage() {
-    return Container(
-      decoration: BoxDecoration(
-        image: DecorationImage(image: _allImages[0], fit: BoxFit.cover),
-      ),
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 132),
-          child: GestureDetector(
-            onTapDown: (_) => setState(() => _idlePressed = true),
-            onTapUp: (_) {
-              setState(() => _idlePressed = false);
-              _goTo(AppState.ready);
-            },
-            onTapCancel: () => setState(() => _idlePressed = false),
-            child: Container(
-              width: 370,
-              height: 85,
-              decoration: BoxDecoration(
-                color: _idlePressed
-                    ? Colors.white.withValues(alpha: 0.25)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
+    return Stack(
+      children: [
+        if (_idleVideoController.value.isInitialized)
+          SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: _idleVideoController.value.size.width,
+                height: _idleVideoController.value.size.height,
+                child: VideoPlayer(_idleVideoController),
               ),
-              alignment: Alignment.center,
             ),
           ),
+
+        PageNavButton(isLeft: false, onTap: () => _goTo(AppState.ready)),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 60,
+          child: Center(child: IdleButton(onTap: () => _goTo(AppState.ready))),
         ),
-      ),
+      ],
     );
   }
 
-  // === READY 화면 (2_ready ~ 6_ready 슬라이드, 6_ready에만 시작 버튼) ===
+  // === READY 화면 ===
   Widget _buildReadyPage() {
-    final readyImages = _allImages.sublist(1, 6);
     return Listener(
       onPointerDown: (_) => _resetTimer(),
       child: Stack(
         children: [
-          PageView(
-            controller: _readyPageController,
-            children: [
-              for (int i = 0; i < readyImages.length; i++)
-                Container(
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: readyImages[i],
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  child: i == readyImages.length - 1
-                      ? Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 60),
-                            child: Listener(
-                              onPointerDown: (_) async {
-                                setState(() => _readyStartPressed = true);
-                                await _sendUdp('N');
-                                _goTo(AppState.play);
-                              },
-                              onPointerUp: (_) =>
-                                  setState(() => _readyStartPressed = false),
-                              onPointerCancel: (_) =>
-                                  setState(() => _readyStartPressed = false),
-                              child: Container(
-                                width: 370,
-                                height: 85,
-                                decoration: BoxDecoration(
-                                  color: _readyStartPressed
-                                      ? Colors.white.withValues(alpha: 0.25)
-                                      : Colors.transparent,
-                                  // border: Border.all(
-                                  //   color: Colors.black.withValues(alpha: 0.5),
-                                  // ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : null,
+          if (_readyVideoController.value.isInitialized)
+            SizedBox.expand(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _readyVideoController.value.size.width,
+                  height: _readyVideoController.value.size.height,
+                  child: VideoPlayer(_readyVideoController),
                 ),
-            ],
-          ),
-          // 좌측 중앙 이전 버튼
+              ),
+            ),
           PageNavButton(
             isLeft: true,
-            onTap: () => _readyPageController.previousPage(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            ),
+            onTap: () async {
+              await _sendUdp('I');
+              _goTo(AppState.idle);
+            },
           ),
-          // 우측 중앙 다음 버튼
-          PageNavButton(
-            isLeft: false,
-            onTap: () => _readyPageController.nextPage(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            ),
-          ),
-          // 우측 상단 IDLE 복귀 버튼
           ExitButton(
             onTap: () async {
               await _sendUdp('I');
               _goTo(AppState.idle);
             },
           ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 60,
+            child: AnimatedOpacity(
+              opacity: _readyButtonVisible ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeIn,
+              child: IgnorePointer(
+                ignoring: !_readyButtonVisible,
+                child: Center(
+                  child: StartButton(
+                    onTap: () async {
+                      _sendUdp('N');
+                      _goTo(AppState.play);
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
+
+        // 우측 상단 IDLE 복귀 버튼 (항상 표시)
       ),
     );
   }
@@ -393,11 +446,19 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // === PLAY 화면 (터치해도 타이머 리셋 없음 — 무조건 END로 전환) ===
   Widget _buildPlayPage() {
     return Container(
-      decoration: BoxDecoration(
-        image: DecorationImage(image: _allImages[6], fit: BoxFit.cover),
-      ),
       child: Stack(
         children: [
+          if (_playVideoController.value.isInitialized)
+            SizedBox.expand(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _playVideoController.value.size.width,
+                  height: _playVideoController.value.size.height,
+                  child: VideoPlayer(_playVideoController),
+                ),
+              ),
+            ),
           // 우측 상단 IDLE 복귀 버튼
           ExitButton(
             onTap: () async {
@@ -407,56 +468,80 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           ),
           // 우측 중앙 다음(END) 버튼 — 타이머 만료 후에만 활성화
           if (_playTimerExpired)
-            PageNavButton(isLeft: false, onTap: () => _goTo(AppState.end)),
+            PageNavButton(
+              isLeft: false,
+              isWhite: true,
+              onTap: () => _goTo(AppState.end),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEndPage() {
+    return Container(
+      child: Stack(
+        children: [
+          if (_endVideoController.value.isInitialized)
+            SizedBox.expand(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _endVideoController.value.size.width,
+                  height: _endVideoController.value.size.height,
+                  child: VideoPlayer(_endVideoController),
+                ),
+              ),
+            ),
+          // NEXT 버튼
+          PageNavButton(
+            isLeft: false,
+            isWhite: true,
+            onTap: () => _goTo(AppState.survey),
+          ),
+          ExitButton(
+            onTap: () async {
+              await _sendUdp('I');
+              _goTo(AppState.idle);
+            },
+          ),
         ],
       ),
     );
   }
 
   // === END 화면 (8_end ~ 10_end 슬라이드, 10_end에 첫화면 버튼) ===
-  Widget _buildEndPage() {
-    final endImages = _allImages.sublist(7, 10);
+  Widget _buildSurveyPage() {
+    final surveyImages = _allImages;
     return Listener(
       onPointerDown: (_) => _resetTimer(),
       child: Stack(
         children: [
           PageView(
-            controller: _endPageController,
+            controller: _surveyPageController,
             children: [
-              for (int i = 0; i < endImages.length; i++)
+              for (int i = 0; i < surveyImages.length; i++)
                 Container(
                   decoration: BoxDecoration(
                     image: DecorationImage(
-                      image: endImages[i],
+                      image: surveyImages[i],
                       fit: BoxFit.cover,
                     ),
                   ),
-                  child: i == endImages.length - 1
+                  child: i == surveyImages.length - 1
                       ? Align(
                           alignment: Alignment.bottomCenter,
                           child: Padding(
-                            padding: const EdgeInsets.only(bottom: 70),
+                            padding: const EdgeInsets.only(bottom: 30),
                             child: GestureDetector(
-                              onTapDown: (_) {
-                                setState(() => _endHomePressed = true);
-                                HapticFeedback.lightImpact();
-                              },
-                              onTapUp: (_) async {
-                                setState(() => _endHomePressed = false);
+                              onTap: () async {
                                 await _sendUdp('I');
                                 _goTo(AppState.idle);
                               },
-                              onTapCancel: () =>
-                                  setState(() => _endHomePressed = false),
                               child: Container(
-                                width: 570,
-                                height: 95,
-                                decoration: BoxDecoration(
-                                  color: _endHomePressed
-                                      ? Colors.white.withValues(alpha: 0.25)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                                width: 300,
+                                height: 100,
+                                color: Colors.transparent,
                               ),
                             ),
                           ),
@@ -475,7 +560,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           // 좌측 중앙 이전 버튼
           PageNavButton(
             isLeft: true,
-            onTap: () => _endPageController.previousPage(
+            isVisible: false,
+            onTap: () => _surveyPageController.previousPage(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             ),
@@ -483,7 +569,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           // 우측 중앙 다음 버튼
           PageNavButton(
             isLeft: false,
-            onTap: () => _endPageController.nextPage(
+            isVisible: false,
+            onTap: () => _surveyPageController.nextPage(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             ),

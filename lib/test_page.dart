@@ -38,6 +38,7 @@ class _TestPageState extends State<TestPage> {
   late TextEditingController _readyTimerController;
   late TextEditingController _playTimerController;
   late TextEditingController _endTimerController;
+  late TextEditingController _surveyTimerController;
 
   // --- 세팅 토글 상태 ---
   bool _kioskMode = false;
@@ -56,6 +57,7 @@ class _TestPageState extends State<TestPage> {
     _readyTimerController = TextEditingController();
     _playTimerController = TextEditingController();
     _endTimerController = TextEditingController();
+    _surveyTimerController = TextEditingController();
     _udpSubscription = _udp.onReceive.listen((msg) {
       setState(() => _lastReceived = msg);
     });
@@ -69,6 +71,8 @@ class _TestPageState extends State<TestPage> {
     final readyTimer = prefs.getInt('timer_ready');
     final playTimer = prefs.getInt('timer_play');
     final endTimer = prefs.getInt('timer_end');
+    final surveyTimer = prefs.getInt('timer_survey');
+
     final kiosk = prefs.getBool('kiosk_mode') ?? false;
     final landscape = prefs.getBool('landscape_mode') ?? false;
     final wake = prefs.getBool('wake_lock') ?? false;
@@ -86,6 +90,8 @@ class _TestPageState extends State<TestPage> {
       _readyTimerController.text = (readyTimer ?? 120).toString();
       _playTimerController.text = (playTimer ?? 14).toString();
       _endTimerController.text = (endTimer ?? 120).toString();
+      _surveyTimerController.text = (surveyTimer ?? 120).toString();
+
       _kioskMode = kiosk;
       _landscapeMode = landscape;
       _wakeLock = wake;
@@ -105,11 +111,15 @@ class _TestPageState extends State<TestPage> {
     final readyTimer = int.tryParse(_readyTimerController.text.trim()) ?? 120;
     final playTimer = int.tryParse(_playTimerController.text.trim()) ?? 14;
     final endTimer = int.tryParse(_endTimerController.text.trim()) ?? 120;
+    final surveyTimer = int.tryParse(_surveyTimerController.text.trim()) ?? 120;
+
     await prefs.setString('target_ip', ip);
     await prefs.setInt('target_port', port);
     await prefs.setInt('timer_ready', readyTimer);
     await prefs.setInt('timer_play', playTimer);
     await prefs.setInt('timer_end', endTimer);
+    await prefs.setInt('timer_survey', surveyTimer);
+
     _udp.targetIp = ip;
     _udp.targetPort = port;
     if (mounted) FocusScope.of(context).unfocus();
@@ -350,9 +360,15 @@ class _TestPageState extends State<TestPage> {
     _udp.sendFast(command);
     // 바이너리 프레임도 함께 전송
     switch (command) {
-      case 'R': _motor.moveRight(); break;
-      case 'L': _motor.moveLeft(); break;
-      case 'S': _motor.stop(); break;
+      case 'R':
+        _motor.moveRight();
+        break;
+      case 'L':
+        _motor.moveLeft();
+        break;
+      case 'S':
+        _motor.stop();
+        break;
     }
   }
 
@@ -361,10 +377,18 @@ class _TestPageState extends State<TestPage> {
       await _udp.send(command);
       // 바이너리 프레임도 함께 전송
       switch (command) {
-        case 'N': await _motor.motorOn(); break;
-        case 'F': await _motor.motorOff(); break;
-        case 'I': await _motor.reset(); break;
-        case 'O': await _motor.saveOrigin(); break;
+        case 'N':
+          await _motor.motorOn();
+          break;
+        case 'F':
+          await _motor.motorOff();
+          break;
+        case 'I':
+          await _motor.reset();
+          break;
+        case 'O':
+          await _motor.saveOrigin();
+          break;
       }
       setState(() {
         _status = command == 'N'
@@ -555,6 +579,16 @@ class _TestPageState extends State<TestPage> {
                         child: TextField(
                           controller: _endTimerController,
                           decoration: _inputDeco('END', '120'),
+                          style: const TextStyle(color: _textWhite),
+                          keyboardType: TextInputType.number,
+                          onSubmitted: (_) => _saveSettings(),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _surveyTimerController,
+                          decoration: _inputDeco('SURVEY', '120'),
                           style: const TextStyle(color: _textWhite),
                           keyboardType: TextInputType.number,
                           onSubmitted: (_) => _saveSettings(),

@@ -15,6 +15,7 @@ class UdpCommand {
   static const moveLeft = 'L';
   static const stop = 'S';
   static const saveOrigin = 'O';
+  static const setup = 'P';
 
   static const _names = {
     'N': '모터ON',
@@ -25,6 +26,7 @@ class UdpCommand {
     'L': '왼쪽',
     'S': '멈춤',
     'O': '원점저장',
+    'P': '전시시작',
   };
   static String nameOf(String cmd) => _names[cmd] ?? cmd;
 }
