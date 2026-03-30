@@ -12,7 +12,7 @@ class MotorController {
   // 60각 설정값(속도 : 300, 포지션 -1200~1200, 대기 200ms)
   // 45각 설정값, 웜기어 ( 속도 : 310, 포지션 -40000~40000, 대기 200ms)
   static const int _pos = 40000;
-  static const int _vel = 2600;
+  static const int _vel = 2900;
   static const int _wait = 200;
 
   static const int _master = 0;

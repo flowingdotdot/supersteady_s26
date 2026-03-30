@@ -44,7 +44,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
-    AssetImage('assets/images/survey/4_1/1_1.jpg'),
+    AssetImage('assets/images/survey/4_1/1_1.png'),
     AssetImage('assets/images/survey/4_1/1_2.png'),
   ];
   // 이미지 로딩 완료 여부
@@ -147,7 +147,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _readySeconds = prefs.getInt('timer_ready') ?? 120;
-      _playSeconds = prefs.getInt('timer_play') ?? 15;
+      _playSeconds = prefs.getInt('timer_play') ?? 14;
       _endSeconds = prefs.getInt('timer_end') ?? 120;
       _surveySeconds = prefs.getInt('timer_survey') ?? 120;
       _udp.targetIp = prefs.getString('target_ip') ?? '192.168.240.255';
@@ -408,6 +408,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
               await _sendUdp('I');
               _goTo(AppState.idle);
             },
+          ),
+          PageNavButton(
+            isLeft: false,
+            onTap: () => setState(() => _readyButtonVisible = true),
           ),
           ExitButton(
             onTap: () async {
