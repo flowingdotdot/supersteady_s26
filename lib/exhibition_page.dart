@@ -147,7 +147,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _readySeconds = prefs.getInt('timer_ready') ?? 120;
-      _playSeconds = prefs.getInt('timer_play') ?? 14;
+      _playSeconds = prefs.getInt('timer_play') ?? 15;
       _endSeconds = prefs.getInt('timer_end') ?? 120;
       _surveySeconds = prefs.getInt('timer_survey') ?? 120;
       _udp.targetIp = prefs.getString('target_ip') ?? '192.168.240.255';
@@ -179,7 +179,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         await _motor.motorOn();
         break;
       case 'F':
-        await _motor.motorOff();
         break;
       case 'I':
         await _motor.reset();
@@ -256,11 +255,16 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       _remaining = seconds;
       _timer = Timer.periodic(const Duration(seconds: 1), (t) {
         setState(() => _remaining--);
+        if (_state == AppState.play && _remaining == 1) {
+          // 14초: 모터 먼저 정지
+          _motor.motorOff();
+        }
         if (_remaining <= 0) {
           t.cancel();
           _timer = null;
           if (_state == AppState.play) {
-            _sendUdp('F');
+            // 15초: UDP F 신호
+            _udp.send('F');
             setState(() => _playTimerExpired = true);
           } else {
             _sendUdp('I').then((_) => _goTo(AppState.idle));
@@ -466,7 +470,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           // 우측 상단 IDLE 복귀 버튼
           ExitButton(
             onTap: () async {
-              await _sendUdp('F');
+              await _sendUdp('I');
               _goTo(AppState.idle);
             },
           ),
