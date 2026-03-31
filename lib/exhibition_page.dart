@@ -44,8 +44,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
-    AssetImage('assets/images/survey/4_1/1_1.png'),
-    AssetImage('assets/images/survey/4_1/1_2.png'),
+    AssetImage('assets/images/survey/4_6/1_1.png'),
+    AssetImage('assets/images/survey/4_6/1_2.jpg'),
   ];
   // 이미지 로딩 완료 여부
   bool _imagesLoaded = false;
@@ -190,6 +190,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       case 'O':
         await _motor.saveOrigin();
         break;
+      case 'A':
+        break;
+      case 'B':
+        break;
     }
   }
 
@@ -212,7 +216,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         if (!mounted) return;
         setState(() => _readyButtonVisible = true);
         _readyVideoController.pause();
-        Future.delayed(const Duration(seconds: 5), () {
+        Future.delayed(const Duration(seconds: 3), () {
           if (!mounted) return;
           _readyVideoController.setLooping(true);
           _readyVideoController.play();
@@ -299,12 +303,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       setState(() => _remaining--);
       if (_remaining <= 0) {
         t.cancel();
-        if (_state == AppState.play) {
-          _sendUdp('F');
-          setState(() => _playTimerExpired = true);
-        } else {
-          _sendUdp('I').then((_) => _goTo(AppState.idle));
-        }
+        _sendUdp('I').then((_) => _goTo(AppState.idle));
       }
     });
   }
@@ -388,12 +387,19 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             ),
           ),
 
-        PageNavButton(isLeft: false, onTap: () => _goTo(AppState.ready)),
+        PageNavButton(
+          isLeft: false,
+          onTap: () => {_sendUdp('A'), _goTo(AppState.ready)},
+        ),
         Positioned(
           left: 0,
           right: 0,
           bottom: 60,
-          child: Center(child: IdleButton(onTap: () => _goTo(AppState.ready))),
+          child: Center(
+            child: IdleButton(
+              onTap: () => {_sendUdp('A'), _goTo(AppState.ready)},
+            ),
+          ),
         ),
       ],
     );
@@ -489,7 +495,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             PageNavButton(
               isLeft: false,
               isWhite: true,
-              onTap: () => _goTo(AppState.end),
+              onTap: () => {_sendUdp('F'), _goTo(AppState.end)},
             ),
         ],
       ),
