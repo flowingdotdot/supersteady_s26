@@ -68,6 +68,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // _goTo 중복 호출 방지
   bool _navigating = false;
 
+  // ready 영상 13초 타이머
+  Timer? _readyVideoTimer;
+
   // 숨겨진 관리자 진입용
   int _tapCount = 0;
   DateTime? _lastTap;
@@ -118,15 +121,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     }
   }
 
-  void _onReadyVideoEnd() {
-    final v = _readyVideoController.value;
-    if (!v.isInitialized || v.isPlaying) return;
-    if (v.position >= v.duration && !_readyButtonVisible) {
-      if (mounted) setState(() => _readyButtonVisible = true);
-      _readyVideoController.setLooping(true);
-      _readyVideoController.play();
-    }
-  }
+  void _onReadyVideoEnd() {}
 
   @override
   void didChangeDependencies() {
@@ -212,6 +207,20 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     if (newState == AppState.ready) {
       setState(() => _readyButtonVisible = false);
       _readyVideoController.setLooping(false);
+      _readyVideoTimer?.cancel();
+      _readyVideoTimer = Timer(const Duration(seconds: 13), () {
+        if (!mounted) return;
+        setState(() => _readyButtonVisible = true);
+        _readyVideoController.pause();
+        Future.delayed(const Duration(seconds: 5), () {
+          if (!mounted) return;
+          _readyVideoController.setLooping(true);
+          _readyVideoController.play();
+        });
+      });
+    } else {
+      _readyVideoTimer?.cancel();
+      _readyVideoTimer = null;
     }
     switch (newState) {
       case AppState.idle:
@@ -318,6 +327,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _readyVideoTimer?.cancel();
     _udp.dispose();
     _pageController.dispose();
     _surveyPageController.dispose();
