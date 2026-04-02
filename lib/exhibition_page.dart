@@ -44,8 +44,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
-    AssetImage('assets/images/survey/4_6/1_1.png'),
-    AssetImage('assets/images/survey/4_6/1_2.jpg'),
+    AssetImage('assets/images/survey/4_1/1_1.png'),
+    AssetImage('assets/images/survey/4_1/1_2.png'),
   ];
   // 이미지 로딩 완료 여부
   bool _imagesLoaded = false;
@@ -70,6 +70,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // ready 영상 13초 타이머
   Timer? _readyVideoTimer;
+  bool _readyTimerActive = false;
 
   // 숨겨진 관리자 진입용
   int _tapCount = 0;
@@ -200,92 +201,97 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   Future<void> _goTo(AppState newState) async {
     if (_navigating) return;
     _navigating = true;
-    _timer?.cancel();
-    _timer = null;
-    setState(() {
-      _state = newState;
-      if (newState == AppState.play) _playTimerExpired = false;
-    });
+    try {
+      _timer?.cancel();
+      _timer = null;
+      setState(() {
+        _state = newState;
+        if (newState == AppState.play) _playTimerExpired = false;
+      });
 
-    // 영상 재생 제어
-    if (newState == AppState.ready) {
-      setState(() => _readyButtonVisible = false);
-      _readyVideoController.setLooping(false);
-      _readyVideoTimer?.cancel();
-      _readyVideoTimer = Timer(const Duration(seconds: 13), () {
-        if (!mounted) return;
-        setState(() => _readyButtonVisible = true);
-        _readyVideoController.pause();
-        Future.delayed(const Duration(seconds: 3), () {
-          if (!mounted) return;
-          _readyVideoController.setLooping(true);
-          _readyVideoController.play();
+      // 영상 재생 제어
+      if (newState == AppState.ready) {
+        setState(() => _readyButtonVisible = false);
+        _readyVideoController.setLooping(false);
+        _readyVideoTimer?.cancel();
+        _readyTimerActive = true;
+        _readyVideoTimer = Timer(const Duration(seconds: 13), () {
+          if (!mounted || !_readyTimerActive) return;
+          setState(() => _readyButtonVisible = true);
+          _readyVideoController.pause();
+          Future.delayed(const Duration(seconds: 3), () {
+            if (!mounted || !_readyTimerActive) return;
+            _readyVideoController.setLooping(true);
+            _readyVideoController.play();
+          });
         });
-      });
-    } else {
-      _readyVideoTimer?.cancel();
-      _readyVideoTimer = null;
-    }
-    switch (newState) {
-      case AppState.idle:
-        await _idleVideoController.seekTo(Duration.zero);
-        _idleVideoController.play();
-        break;
-      case AppState.ready:
-        await _readyVideoController.seekTo(Duration.zero);
-        _readyVideoController.play();
-        break;
-      case AppState.play:
-        _playVideoController.setLooping(false);
-        await _playVideoController.seekTo(Duration.zero);
-        _playVideoController.play();
-        break;
-      case AppState.end:
-        await _endVideoController.seekTo(Duration.zero);
-        _endVideoController.play();
-        break;
-      case AppState.survey: // 설문 페이지 진입 시 END 영상 정지
-        _endVideoController.pause();
-        break;
-    }
+      } else {
+        _readyTimerActive = false;
+        _readyVideoTimer?.cancel();
+        _readyVideoTimer = null;
+      }
+      switch (newState) {
+        case AppState.idle:
+          await _idleVideoController.seekTo(Duration.zero);
+          _idleVideoController.play();
+          break;
+        case AppState.ready:
+          await _readyVideoController.seekTo(Duration.zero);
+          _readyVideoController.play();
+          break;
+        case AppState.play:
+          _playVideoController.setLooping(false);
+          await _playVideoController.seekTo(Duration.zero);
+          await _playVideoController.play();
+          break;
+        case AppState.end:
+          await _endVideoController.seekTo(Duration.zero);
+          _endVideoController.play();
+          break;
+        case AppState.survey: // 설문 페이지 진입 시 END 영상 정지
+          _endVideoController.pause();
+          break;
+      }
 
-    _pageController.animateToPage(
-      newState.index,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-    );
+      _pageController.animateToPage(
+        newState.index,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
 
-    // IDLE이 아니면 타이머 시작
-    if (newState != AppState.idle) {
-      final seconds = switch (newState) {
-        AppState.ready => _readySeconds,
-        AppState.play => _playSeconds,
-        AppState.end => _endSeconds,
-        AppState.survey => _surveySeconds,
-        _ => 10,
-      };
+      // IDLE이 아니면 타이머 시작
+      if (newState != AppState.idle) {
+        final seconds = switch (newState) {
+          AppState.ready => _readySeconds,
+          AppState.play => _playSeconds,
+          AppState.end => _endSeconds,
+          AppState.survey => _surveySeconds,
+          _ => 10,
+        };
 
-      _remaining = seconds;
-      _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-        setState(() => _remaining--);
-        if (_state == AppState.play && _remaining == 1) {
-          // 14초: 모터 먼저 정지
-          _motor.motorOff();
-        }
-        if (_remaining <= 0) {
-          t.cancel();
-          _timer = null;
-          if (_state == AppState.play) {
-            // 15초: UDP F 신호
-            _udp.send('F');
-            setState(() => _playTimerExpired = true);
-          } else {
-            _sendUdp('I').then((_) => _goTo(AppState.idle));
+        _remaining = seconds;
+        _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+          setState(() => _remaining--);
+          if (_state == AppState.play && _remaining == 1) {
+            // 14초: 모터 먼저 정지
+            _motor.motorOff();
           }
-        }
-      });
+          if (_remaining <= 0) {
+            t.cancel();
+            _timer = null;
+            if (_state == AppState.play) {
+              // 15초: UDP F 신호
+              _udp.send('F');
+              setState(() => _playTimerExpired = true);
+            } else {
+              _sendUdp('I').then((_) => _goTo(AppState.idle));
+            }
+          }
+        });
+      }
+    } finally {
+      _navigating = false;
     }
-    _navigating = false;
   }
 
   void _resetTimer() {
@@ -452,8 +458,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                 child: Center(
                   child: StartButton(
                     onTap: () async {
-                      _sendUdp('N');
-                      _goTo(AppState.play);
+                      await _sendUdp('N');
+                      await _goTo(AppState.play);
                     },
                   ),
                 ),
