@@ -14,7 +14,7 @@ import 'widgets/idle_button.dart';
 import 'widgets/page_nav_button.dart';
 import 'widgets/start_button.dart';
 
-enum AppState { idle, ready, play, end, survey }
+enum AppState { idle, ready1, ready2, play, end, survey }
 
 class ExhibitionPage extends StatefulWidget {
   const ExhibitionPage({super.key});
@@ -53,12 +53,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // 슬라이드 컨트롤러
   final PageController _surveyPageController = PageController();
 
-  // 영상 컨트롤러
-  late VideoPlayerController _idleVideoController;
-  late VideoPlayerController _readyVideoController;
-  late VideoPlayerController _playVideoController;
-  late VideoPlayerController _endVideoController;
-
   // Play 타이머 만료 여부 (만료 전까지 다음 버튼 비활성화)
   bool _playTimerExpired = false;
 
@@ -72,9 +66,19 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   Timer? _readyVideoTimer;
   bool _readyTimerActive = false;
 
+  // end 영상 6초 타이머
+  Timer? _endUdpTimer;
+
   // 숨겨진 관리자 진입용
   int _tapCount = 0;
   DateTime? _lastTap;
+
+  // 영상 컨트롤러
+  late VideoPlayerController _idleVideoController;
+  late VideoPlayerController _ready1VideoController;
+  late VideoPlayerController _ready2VideoController;
+  late VideoPlayerController _playVideoController;
+  late VideoPlayerController _endVideoController;
 
   @override
   void initState() {
@@ -89,9 +93,13 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       _idleVideoController = VideoPlayerController.asset(
         'assets/videos/idle_p1.mp4',
       ),
-      _readyVideoController = VideoPlayerController.asset(
+      _ready1VideoController = VideoPlayerController.asset(
         'assets/videos/ready_p1.mp4',
       ),
+      _ready2VideoController = VideoPlayerController.asset(
+        'assets/videos/ready_p2.mp4',
+      ),
+
       _playVideoController = VideoPlayerController.asset(
         'assets/videos/play_p1.mp4',
       ),
@@ -100,13 +108,27 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       ),
     ];
     await Future.wait(controllers.map((c) => c.initialize()));
-    for (final c in controllers) {
-      c.setLooping(true);
-    }
-    _readyVideoController.addListener(_onReadyVideoEnd);
+    _idleVideoController.setLooping(true);
+    _ready1VideoController.setLooping(false);
+    _ready2VideoController.setLooping(false);
+    _playVideoController.setLooping(false);
+    _endVideoController.setLooping(false);
+
     _playVideoController.addListener(_onPlayVideoEnd);
+    _endVideoController.addListener(_onEndVideoEnd);
     _idleVideoController.play();
     if (mounted) setState(() {});
+  }
+
+  void _onEndVideoEnd() {
+    if (_navigating) return;
+    final v = _endVideoController.value;
+    if (!v.isInitialized || v.isPlaying) return;
+    final remaining = v.duration - v.position;
+    if (remaining < const Duration(milliseconds: 300) &&
+        _state == AppState.end) {
+      if (mounted) _goTo(AppState.survey);
+    }
   }
 
   void _onPlayVideoEnd() {
@@ -121,8 +143,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       });
     }
   }
-
-  void _onReadyVideoEnd() {}
 
   @override
   void didChangeDependencies() {
@@ -142,10 +162,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   Future<void> _loadTimerSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _readySeconds = prefs.getInt('timer_ready') ?? 120;
+      _readySeconds = prefs.getInt('timer_ready') ?? 180;
       _playSeconds = prefs.getInt('timer_play') ?? 15;
-      _endSeconds = prefs.getInt('timer_end') ?? 120;
-      _surveySeconds = prefs.getInt('timer_survey') ?? 120;
+      _endSeconds = prefs.getInt('timer_end') ?? 180;
+      _surveySeconds = prefs.getInt('timer_survey') ?? 180;
       _udp.targetIp = prefs.getString('target_ip') ?? '192.168.240.255';
       _udp.targetPort = prefs.getInt('target_port') ?? 10025;
     });
@@ -198,6 +218,14 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     }
   }
 
+  void _startEndUdpTimer() {
+    _endUdpTimer?.cancel();
+    _endUdpTimer = Timer(const Duration(seconds: 6), () {
+      if (!mounted || _state != AppState.end) return;
+      _sendUdp('B');
+    });
+  }
+
   Future<void> _goTo(AppState newState) async {
     if (_navigating) return;
     _navigating = true;
@@ -210,20 +238,13 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       });
 
       // 영상 재생 제어
-      if (newState == AppState.ready) {
+      if (newState == AppState.ready1) {
         setState(() => _readyButtonVisible = false);
-        _readyVideoController.setLooping(false);
         _readyVideoTimer?.cancel();
         _readyTimerActive = true;
         _readyVideoTimer = Timer(const Duration(seconds: 13), () {
           if (!mounted || !_readyTimerActive) return;
           setState(() => _readyButtonVisible = true);
-          _readyVideoController.pause();
-          Future.delayed(const Duration(seconds: 3), () {
-            if (!mounted || !_readyTimerActive) return;
-            _readyVideoController.setLooping(true);
-            _readyVideoController.play();
-          });
         });
       } else {
         _readyTimerActive = false;
@@ -235,10 +256,15 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           await _idleVideoController.seekTo(Duration.zero);
           _idleVideoController.play();
           break;
-        case AppState.ready:
-          await _readyVideoController.seekTo(Duration.zero);
-          _readyVideoController.play();
+        case AppState.ready1:
+          await _ready1VideoController.seekTo(Duration.zero);
+          _ready1VideoController.play();
           break;
+        case AppState.ready2:
+          await _ready2VideoController.seekTo(Duration.zero);
+          _ready2VideoController.play();
+          break;
+
         case AppState.play:
           _playVideoController.setLooping(false);
           await _playVideoController.seekTo(Duration.zero);
@@ -247,6 +273,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         case AppState.end:
           await _endVideoController.seekTo(Duration.zero);
           _endVideoController.play();
+          _startEndUdpTimer();
           break;
         case AppState.survey: // 설문 페이지 진입 시 END 영상 정지
           _endVideoController.pause();
@@ -262,7 +289,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       // IDLE이 아니면 타이머 시작
       if (newState != AppState.idle) {
         final seconds = switch (newState) {
-          AppState.ready => _readySeconds,
+          AppState.ready1 => _readySeconds,
+          AppState.ready2 => _readySeconds,
           AppState.play => _playSeconds,
           AppState.end => _endSeconds,
           AppState.survey => _surveySeconds,
@@ -298,7 +326,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     if (_state == AppState.idle || _state == AppState.play) return;
     _timer?.cancel();
     final seconds = switch (_state) {
-      AppState.ready => _readySeconds,
+      AppState.ready1 => _readySeconds,
+      AppState.ready2 => _readySeconds,
       AppState.play => _playSeconds,
       AppState.end => _endSeconds,
       AppState.survey => _surveySeconds,
@@ -333,11 +362,13 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   void dispose() {
     _timer?.cancel();
     _readyVideoTimer?.cancel();
+    _endUdpTimer?.cancel();
     _udp.dispose();
     _pageController.dispose();
     _surveyPageController.dispose();
     _idleVideoController.dispose();
-    _readyVideoController.dispose();
+    _ready1VideoController.dispose();
+    _ready2VideoController.dispose();
     _playVideoController.dispose();
     _endVideoController.dispose();
     super.dispose();
@@ -355,7 +386,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
                     _buildIdlePage(),
-                    _buildReadyPage(),
+                    _buildReady1Page(),
+                    _buildReady2Page(),
                     _buildPlayPage(),
                     _buildEndPage(),
                     _buildSurveyPage(),
@@ -393,17 +425,16 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             ),
           ),
 
-        PageNavButton(
-          isLeft: false,
-          onTap: () => {_sendUdp('A'), _goTo(AppState.ready)},
-        ),
         Positioned(
           left: 0,
           right: 0,
           bottom: 60,
           child: Center(
             child: IdleButton(
-              onTap: () => {_sendUdp('A'), _goTo(AppState.ready)},
+              onTap: () async {
+                await _sendUdp('A');
+                _goTo(AppState.ready1);
+              },
             ),
           ),
         ),
@@ -412,32 +443,83 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   }
 
   // === READY 화면 ===
-  Widget _buildReadyPage() {
+  Widget _buildReady1Page() {
     return Listener(
       onPointerDown: (_) => _resetTimer(),
       child: Stack(
         children: [
-          if (_readyVideoController.value.isInitialized)
+          if (_ready1VideoController.value.isInitialized)
             SizedBox.expand(
               child: FittedBox(
                 fit: BoxFit.cover,
                 child: SizedBox(
-                  width: _readyVideoController.value.size.width,
-                  height: _readyVideoController.value.size.height,
-                  child: VideoPlayer(_readyVideoController),
+                  width: _ready1VideoController.value.size.width,
+                  height: _ready1VideoController.value.size.height,
+                  child: VideoPlayer(_ready1VideoController),
                 ),
               ),
             ),
           PageNavButton(
             isLeft: true,
+            isVisible: false,
+            onTap: () async {
+              await _ready1VideoController.seekTo(Duration.zero);
+              _ready1VideoController.play();
+            },
+          ),
+          PageNavButton(
+            isLeft: false,
+            isVisible: false,
+            onTap: () async {
+              await _goTo(AppState.ready2);
+            },
+          ),
+          ExitButton(
             onTap: () async {
               await _sendUdp('I');
               _goTo(AppState.idle);
             },
           ),
+        ],
+
+        // 우측 상단 IDLE 복귀 버튼 (항상 표시)
+      ),
+    );
+  }
+
+  // === READY2 화면 ===
+  Widget _buildReady2Page() {
+    return Listener(
+      onPointerDown: (_) => _resetTimer(),
+      child: Stack(
+        children: [
+          if (_ready2VideoController.value.isInitialized)
+            SizedBox.expand(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _ready2VideoController.value.size.width,
+                  height: _ready2VideoController.value.size.height,
+                  child: VideoPlayer(_ready2VideoController),
+                ),
+              ),
+            ),
+          PageNavButton(
+            isLeft: true,
+            isVisible: false,
+            onTap: () async {
+              await _ready2VideoController.seekTo(Duration.zero);
+              _ready2VideoController.play();
+            },
+          ),
           PageNavButton(
             isLeft: false,
-            onTap: () => setState(() => _readyButtonVisible = true),
+            isVisible: false,
+            onTap: () async {
+              setState(() => _readyButtonVisible = true);
+              await _ready2VideoController.seekTo(const Duration(seconds: 6));
+              _ready2VideoController.play();
+            },
           ),
           ExitButton(
             onTap: () async {
@@ -448,7 +530,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 60,
+            bottom: 80,
             child: AnimatedOpacity(
               opacity: _readyButtonVisible ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 600),
@@ -489,13 +571,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                 ),
               ),
             ),
-          // 우측 상단 IDLE 복귀 버튼
-          ExitButton(
-            onTap: () async {
-              await _sendUdp('I');
-              _goTo(AppState.idle);
-            },
-          ),
           // 우측 중앙 다음(END) 버튼 — 타이머 만료 후에만 활성화
           if (_playTimerExpired)
             PageNavButton(
@@ -523,11 +598,24 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                 ),
               ),
             ),
-          // NEXT 버튼
+          PageNavButton(
+            isLeft: true,
+            isVisible: false,
+            onTap: () async {
+              await _endVideoController.seekTo(Duration.zero);
+              _endVideoController.play();
+              _startEndUdpTimer();
+            },
+          ),
+
           PageNavButton(
             isLeft: false,
             isWhite: true,
-            onTap: () => _goTo(AppState.survey),
+            isVisible: false,
+            onTap: () async {
+              await _sendUdp('B');
+              await _goTo(AppState.survey);
+            },
           ),
           ExitButton(
             onTap: () async {
@@ -579,13 +667,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                       : null,
                 ),
             ],
-          ),
-          // 우측 상단 IDLE 복귀 버튼
-          ExitButton(
-            onTap: () async {
-              await _sendUdp('I');
-              _goTo(AppState.idle);
-            },
           ),
           // 좌측 중앙 이전 버튼
           PageNavButton(

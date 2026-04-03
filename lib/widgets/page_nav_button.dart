@@ -48,10 +48,12 @@ class _PageNavButtonState extends State<PageNavButton> {
             widget.onTap();
           },
           onTapCancel: () => setState(() => _pressed = false),
-          child: Opacity(
-            opacity: widget.isVisible ? (_pressed ? 0.6 : 1.0) : 0.0,
+          child: widget.isVisible
+              ? Opacity(
+                  opacity: _pressed ? 0.6 : 1.0,
             child: Image.asset(_imagePath, width: 50, height: 50),
-          ),
+                )
+              : Container(width: 50, height: 50, color: const Color(0x01000000)),
         ),
       ),
     );
