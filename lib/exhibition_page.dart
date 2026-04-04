@@ -44,8 +44,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
-    AssetImage('assets/images/survey/4_1/1_1.png'),
-    AssetImage('assets/images/survey/4_1/1_2.png'),
+    AssetImage('assets/images/survey/gangnam/1_1.png'),
+    AssetImage('assets/images/survey/gangnam/1_2.jpg'),
+
+    //
   ];
   // 이미지 로딩 완료 여부
   bool _imagesLoaded = false;
