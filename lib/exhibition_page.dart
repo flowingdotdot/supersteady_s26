@@ -59,7 +59,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     AssetImage('assets/images/p2_7_play.png'),
     AssetImage('assets/images/p2_8_end.png'),
     AssetImage('assets/images/p2_9_end.png'),
-    AssetImage('assets/images/p2_10_end.png'),
   ];
 
   // 이미지 로딩 완료 여부
@@ -72,7 +71,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // 버튼 탭 피드백
   bool _idlePressed = false;
   bool _readyStartPressed = false;
-  bool _endHomePressed = false;
 
   // Play 타이머 만료 여부 (만료 전까지 다음 버튼 비활성화)
   bool _playTimerExpired = false;
@@ -132,13 +130,27 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     await _udp.send(command);
     // 바이너리 프레임도 함께 전송 (모터드라이버 직접 통신용)
     switch (command) {
-      case 'N': await _motor.motorOn(); break;
-      case 'F': await _motor.motorOff(); break;
-      case 'I': await _motor.reset(); break;
-      case 'R': await _motor.moveRight(); break;
-      case 'L': await _motor.moveLeft(); break;
-      case 'S': await _motor.stop(); break;
-      case 'O': await _motor.saveOrigin(); break;
+      case 'N':
+        await _motor.motorOn();
+        break;
+      case 'F':
+        await _motor.motorOff();
+        break;
+      case 'I':
+        await _motor.reset();
+        break;
+      case 'R':
+        await _motor.moveRight();
+        break;
+      case 'L':
+        await _motor.moveLeft();
+        break;
+      case 'S':
+        await _motor.stop();
+        break;
+      case 'O':
+        await _motor.saveOrigin();
+        break;
     }
   }
 
@@ -401,7 +413,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // === END 화면 (8_end ~ 10_end 슬라이드, 10_end에 첫화면 버튼) ===
   Widget _buildEndPage() {
-    final endImages = _allImages.sublist(7, 10);
+    final endImages = _allImages.sublist(7, 9);
     return Listener(
       onPointerDown: (_) => _resetTimer(),
       child: Stack(
@@ -417,37 +429,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
                       fit: BoxFit.cover,
                     ),
                   ),
-                  child: i == endImages.length - 1
-                      ? Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 70),
-                            child: GestureDetector(
-                              onTapDown: (_) {
-                                setState(() => _endHomePressed = true);
-                                HapticFeedback.lightImpact();
-                              },
-                              onTapUp: (_) async {
-                                setState(() => _endHomePressed = false);
-                                await _sendUdp('I');
-                                _goTo(AppState.idle);
-                              },
-                              onTapCancel: () =>
-                                  setState(() => _endHomePressed = false),
-                              child: Container(
-                                width: 570,
-                                height: 95,
-                                decoration: BoxDecoration(
-                                  color: _endHomePressed
-                                      ? Colors.white.withValues(alpha: 0.25)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : null,
+                  child: null,
                 ),
             ],
           ),
