@@ -64,9 +64,8 @@ flutter:
   assets:
     - assets/images/
     - assets/images/icon/
-    - assets/images/survey/gangnam/
-    - assets/videos/gangnam/
-    #- assets/videos/hongdae/
+    - assets/images/survey/hongdae/
+    - assets/videos/hongdae/
     
 
   # An image asset can refer to one or more resolution-specific "variants", see

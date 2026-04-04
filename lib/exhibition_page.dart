@@ -44,10 +44,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
-    AssetImage('assets/images/survey/gangnam/1_1.png'),
-    AssetImage('assets/images/survey/gangnam/1_2.jpg'),
-
-    //
+    AssetImage('assets/images/survey/hongdae/1_1.png'),
   ];
   // 이미지 로딩 완료 여부
   bool _imagesLoaded = false;
@@ -649,61 +646,23 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // === END 화면 (8_end ~ 10_end 슬라이드, 10_end에 첫화면 버튼) ===
   Widget _buildSurveyPage() {
-    final surveyImages = _allImages;
     return Listener(
       onPointerDown: (_) => _resetTimer(),
       child: Stack(
         children: [
-          PageView(
-            controller: _surveyPageController,
-            children: [
-              for (int i = 0; i < surveyImages.length; i++)
-                Container(
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: surveyImages[i],
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  child: i == surveyImages.length - 1
-                      ? Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 30),
-                            child: GestureDetector(
-                              onTap: () async {
-                                await _sendUdp('I');
-                                _goTo(AppState.idle);
-                              },
-                              child: Container(
-                                width: 300,
-                                height: 100,
-                                color: Colors.transparent,
-                              ),
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
-            ],
-          ),
-          // 좌측 중앙 이전 버튼
-          PageNavButton(
-            isLeft: true,
-            isVisible: false,
-            onTap: () => _surveyPageController.previousPage(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
+          Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: _allImages[0],
+                fit: BoxFit.cover,
+              ),
             ),
           ),
-          // 우측 중앙 다음 버튼
-          PageNavButton(
-            isLeft: false,
-            isVisible: false,
-            onTap: () => _surveyPageController.nextPage(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            ),
+          ExitButton(
+            onTap: () async {
+              await _sendUdp('I');
+              _goTo(AppState.idle);
+            },
           ),
         ],
       ),
