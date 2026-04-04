@@ -85,6 +85,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   void initState() {
     super.initState();
     _loadTimerSettings();
+    _motor.setup();
   }
 
   @override
