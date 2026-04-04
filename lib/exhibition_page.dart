@@ -91,20 +91,20 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   Future<void> _initVideos() async {
     final controllers = [
       _idleVideoController = VideoPlayerController.asset(
-        'assets/videos/idle_p1.mp4',
+        'assets/videos/gangnam/idle_p1.mp4',
       ),
       _ready1VideoController = VideoPlayerController.asset(
-        'assets/videos/ready_p1.mp4',
+        'assets/videos/gangnam/ready_p1.mp4',
       ),
       _ready2VideoController = VideoPlayerController.asset(
-        'assets/videos/ready_p2.mp4',
+        'assets/videos/gangnam/ready_p2.mp4',
       ),
 
       _playVideoController = VideoPlayerController.asset(
-        'assets/videos/play_p1.mp4',
+        'assets/videos/gangnam/play_p1.mp4',
       ),
       _endVideoController = VideoPlayerController.asset(
-        'assets/videos/end_p1.mp4',
+        'assets/videos/gangnam/end_p1.mp4',
       ),
     ];
     await Future.wait(controllers.map((c) => c.initialize()));
