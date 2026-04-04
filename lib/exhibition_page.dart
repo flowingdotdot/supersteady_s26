@@ -224,6 +224,11 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         await _motor.saveOrigin();
         break;
       case 'A':
+        for (int i = 0; i < 5; i++) {
+          await Future.delayed(const Duration(milliseconds: 50));
+          //_udp.targetIp = '192.168.240.5';
+          await _udp.send('A');
+        }
         break;
       case 'B':
         break;
@@ -652,10 +657,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         children: [
           Container(
             decoration: BoxDecoration(
-              image: DecorationImage(
-                image: _allImages[0],
-                fit: BoxFit.cover,
-              ),
+              image: DecorationImage(image: _allImages[0], fit: BoxFit.cover),
             ),
           ),
           ExitButton(
