@@ -227,6 +227,13 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         await _motor.saveOrigin();
         break;
       case 'A':
+        //final originalIp = _udp.targetIp;
+        for (int i = 0; i < 5; i++) {
+          await Future.delayed(const Duration(milliseconds: 50));
+          //_udp.targetIp = '192.168.240.5';
+          await _udp.send('A');
+        }
+        //_udp.targetIp = originalIp;
         break;
       case 'B':
         break;
