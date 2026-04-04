@@ -91,20 +91,20 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   Future<void> _initVideos() async {
     final controllers = [
       _idleVideoController = VideoPlayerController.asset(
-        'assets/videos/gangnam/idle_p1.mp4',
+        'assets/videos/hongdae/idle_p1.mp4',
       ),
       _ready1VideoController = VideoPlayerController.asset(
-        'assets/videos/gangnam/ready_p1.mp4',
+        'assets/videos/hongdae/ready_p1.mp4',
       ),
       _ready2VideoController = VideoPlayerController.asset(
-        'assets/videos/gangnam/ready_p2.mp4',
+        'assets/videos/hongdae/ready_p2.mp4',
       ),
 
       _playVideoController = VideoPlayerController.asset(
-        'assets/videos/gangnam/play_p1.mp4',
+        'assets/videos/hongdae/play_p1.mp4',
       ),
       _endVideoController = VideoPlayerController.asset(
-        'assets/videos/gangnam/end_p1.mp4',
+        'assets/videos/hongdae/end_p1.mp4',
       ),
     ];
     await Future.wait(controllers.map((c) => c.initialize()));
@@ -508,6 +508,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             isLeft: true,
             isVisible: false,
             onTap: () async {
+              setState(() => _readyButtonVisible = false);
               await _ready2VideoController.seekTo(Duration.zero);
               _ready2VideoController.play();
             },
