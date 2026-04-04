@@ -65,6 +65,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // ready 영상 13초 타이머
   Timer? _readyVideoTimer;
   bool _readyTimerActive = false;
+  bool _ready2Resetting = false;
 
   // end 영상 6초 타이머
   Timer? _endUdpTimer;
@@ -114,10 +115,22 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _playVideoController.setLooping(false);
     _endVideoController.setLooping(false);
 
+    _ready2VideoController.addListener(_onReady2VideoEnd);
     _playVideoController.addListener(_onPlayVideoEnd);
     _endVideoController.addListener(_onEndVideoEnd);
     _idleVideoController.play();
     if (mounted) setState(() {});
+  }
+
+  void _onReady2VideoEnd() {
+    if (_ready2Resetting) return;
+    final v = _ready2VideoController.value;
+    if (!v.isInitialized || v.isPlaying) return;
+    final remaining = v.duration - v.position;
+    if (remaining < const Duration(milliseconds: 300) &&
+        _state == AppState.ready2) {
+      if (mounted) setState(() => _readyButtonVisible = true);
+    }
   }
 
   void _onEndVideoEnd() {
@@ -238,7 +251,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       });
 
       // 영상 재생 제어
-      if (newState == AppState.ready1) {
+      if (newState == AppState.ready1 || newState == AppState.ready2) {
         setState(() => _readyButtonVisible = false);
         _readyVideoTimer?.cancel();
         _readyTimerActive = true;
@@ -508,8 +521,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             isLeft: true,
             isVisible: false,
             onTap: () async {
+              _ready2Resetting = true;
               setState(() => _readyButtonVisible = false);
               await _ready2VideoController.seekTo(Duration.zero);
+              _ready2Resetting = false;
               _ready2VideoController.play();
             },
           ),
@@ -619,6 +634,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             },
           ),
           ExitButton(
+            showImage: true,
             onTap: () async {
               await _sendUdp('I');
               _goTo(AppState.idle);
