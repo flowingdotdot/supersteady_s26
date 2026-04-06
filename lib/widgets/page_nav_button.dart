@@ -36,8 +36,8 @@ class _PageNavButtonState extends State<PageNavButton> {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: widget.isLeft ? 16 : null,
-      right: widget.isLeft ? null : 16,
+      left: widget.isLeft ? 23 : null,
+      right: widget.isLeft ? null : 23,
       top: 0,
       bottom: 0,
       child: Center(
@@ -51,9 +51,13 @@ class _PageNavButtonState extends State<PageNavButton> {
           child: widget.isVisible
               ? Opacity(
                   opacity: _pressed ? 0.6 : 1.0,
-            child: Image.asset(_imagePath, width: 50, height: 50),
+                  child: Image.asset(_imagePath, width: 70, height: 70),
                 )
-              : Container(width: 50, height: 50, color: const Color(0x01000000)),
+              : Container(
+                  width: 70,
+                  height: 70,
+                  color: const Color(0x01000000),
+                ),
         ),
       ),
     );
