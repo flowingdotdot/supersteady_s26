@@ -86,6 +86,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
     _loadTimerSettings();
     _initVideos();
     _motor.setup();
@@ -126,6 +127,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   void _onReady2VideoEnd() {
     if (_ready2Resetting) return;
+    if (_readyButtonVisible) return;
     final v = _ready2VideoController.value;
     if (!v.isInitialized || v.isPlaying) return;
     final remaining = v.duration - v.position;
@@ -203,7 +205,12 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   }
 
   Future<void> _sendUdp(String command) async {
-    await _udp.send(command);
+    if (command != 'A') {
+      for (int i = 0; i < 3; i++) {
+        await _udp.sendToPort(command, _udp.commandPort);
+        if (i < 2) await Future.delayed(const Duration(milliseconds: 50));
+      }
+    }
     // 바이너리 프레임도 함께 전송 (모터드라이버 직접 통신용)
     switch (command) {
       case 'N':
@@ -227,13 +234,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         await _motor.saveOrigin();
         break;
       case 'A':
-        //final originalIp = _udp.targetIp;
         for (int i = 0; i < 5; i++) {
-          await Future.delayed(const Duration(milliseconds: 50));
-          //_udp.targetIp = '192.168.240.5';
-          await _udp.send('A');
+          await _udp.sendToPort('A', _udp.commandPort);
+          if (i < 4) await Future.delayed(const Duration(milliseconds: 50));
         }
-        //_udp.targetIp = originalIp;
         break;
       case 'B':
         break;
@@ -601,7 +605,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             PageNavButton(
               isLeft: false,
               isWhite: true,
-              onTap: () => {_sendUdp('F'), _goTo(AppState.end)},
+              onTap: () async { await _sendUdp('F'); _goTo(AppState.end); },
             ),
         ],
       ),

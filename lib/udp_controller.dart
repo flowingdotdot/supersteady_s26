@@ -45,6 +45,7 @@ class UdpController {
 
   String targetIp = '192.168.240.255';
   int targetPort = 10025;
+  int commandPort = 10024;
 
   RawDatagramSocket? _socket;
   final _receiveController = StreamController<String>.broadcast();
@@ -81,6 +82,25 @@ class UdpController {
     if (_socket != null) return _socket!;
     await init();
     return _socket!;
+  }
+
+  /// 특정 포트로 전송
+  Future<void> sendToPort(String command, int port) async {
+    final name = _commandNames[command] ?? command;
+    final hex = '0x${command.codeUnitAt(0).toRadixString(16).toUpperCase()}';
+    debugPrint('UDP 전송: \'$command\' ($hex) $name → $targetIp:$port');
+    _sendController.add(command);
+    try {
+      final socket = await _getSocket();
+      final data = utf8.encode(command);
+      socket.send(data, InternetAddress(targetIp), port);
+    } on SocketException catch (e) {
+      debugPrint('UDP 전송 실패 (네트워크 없음): $e');
+    } catch (e) {
+      debugPrint('UDP 전송 실패: $e');
+      _socket?.close();
+      _socket = null;
+    }
   }
 
   /// 일반 전송
