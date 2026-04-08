@@ -57,7 +57,7 @@ class _PageNavButtonState extends State<PageNavButton> {
                   width: 70,
                   height: 70,
                   color: const Color(0x01000000),
-                ), //Color(0x01000000)),
+                ),
         ),
       ),
     );
