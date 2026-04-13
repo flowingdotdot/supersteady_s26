@@ -45,7 +45,7 @@ class UdpController {
 
   String targetIp = '192.168.240.255';
   int targetPort = 10025;
-  int commandPort = 10024;
+  int commandPort = 10025;
 
   RawDatagramSocket? _socket;
   final _receiveController = StreamController<String>.broadcast();
