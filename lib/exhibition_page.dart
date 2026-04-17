@@ -45,7 +45,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
     AssetImage('assets/images/survey/gangnam/1_1.png'),
-    AssetImage('assets/images/survey/gangnam/1_2.jpg'),
+    AssetImage('assets/images/survey/gangnam/1_2.png'),
 
     //
   ];
@@ -278,7 +278,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         // ready 진입 시 A신호 반복 시작
         if (newState == AppState.ready1) {
           _aSignalTimer?.cancel();
-          _aSignalTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+          _aSignalTimer = Timer.periodic(const Duration(milliseconds: 500), (
+            _,
+          ) {
             if (!mounted) return;
             _udp.sendToPort('A', _udp.commandPort);
           });
@@ -621,7 +623,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             PageNavButton(
               isLeft: false,
               isWhite: true,
-              onTap: () async { await _sendUdp('F'); _goTo(AppState.end); },
+              onTap: () async {
+                await _sendUdp('F');
+                _goTo(AppState.end);
+              },
             ),
         ],
       ),
