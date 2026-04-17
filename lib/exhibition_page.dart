@@ -72,6 +72,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // end 영상 6초 타이머
   Timer? _endUdpTimer;
 
+  // keepalive 타이머
+  Timer? _keepaliveTimer;
+
   // 숨겨진 관리자 진입용
   int _tapCount = 0;
   DateTime? _lastTap;
@@ -90,6 +93,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _loadTimerSettings();
     _initVideos();
     _motor.setup();
+    _keepaliveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _udp.sendToPort('K', _udp.commandPort);
+    });
   }
 
   Future<void> _initVideos() async {
@@ -205,11 +211,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   }
 
   Future<void> _sendUdp(String command) async {
-    if (command != 'A') {
-      for (int i = 0; i < 3; i++) {
-        await _udp.sendToPort(command, _udp.commandPort);
-        if (i < 2) await Future.delayed(const Duration(milliseconds: 50));
-      }
+    for (int i = 0; i < 5; i++) {
+      await _udp.sendToPort(command, _udp.commandPort);
+      if (i < 4) await Future.delayed(const Duration(milliseconds: 50));
     }
     // 바이너리 프레임도 함께 전송 (모터드라이버 직접 통신용)
     switch (command) {
@@ -234,10 +238,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         await _motor.saveOrigin();
         break;
       case 'A':
-        for (int i = 0; i < 5; i++) {
-          await _udp.sendToPort('A', _udp.commandPort);
-          if (i < 4) await Future.delayed(const Duration(milliseconds: 50));
-        }
         break;
       case 'B':
         break;
@@ -389,6 +389,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _timer?.cancel();
     _readyVideoTimer?.cancel();
     _endUdpTimer?.cancel();
+    _keepaliveTimer?.cancel();
     _udp.dispose();
     _pageController.dispose();
     _surveyPageController.dispose();
