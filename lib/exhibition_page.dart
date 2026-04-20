@@ -14,7 +14,7 @@ import 'widgets/idle_button.dart';
 import 'widgets/page_nav_button.dart';
 import 'widgets/start_button.dart';
 
-enum AppState { idle, ready1, ready2, play, end, survey }
+enum AppState { idle, ready1, ready2, play, end }
 
 class ExhibitionPage extends StatefulWidget {
   const ExhibitionPage({super.key});
@@ -33,7 +33,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   int _readySeconds = 10;
   int _playSeconds = 10;
   int _endSeconds = 10;
-  int _surveySeconds = 10;
 
   // UDP 컨트롤러
   final _udp = UdpController.instance;
@@ -41,19 +40,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   // 네이티브 채널 (키오스크 모드용)
   static const _platform = MethodChannel('com.example.controller_tablet/kiosk');
-
-  // 모든 에셋 이미지 (시작 시 미리 로드)
-  static const _allImages = [
-    AssetImage('assets/images/survey/gangnam/1_1.png'),
-    AssetImage('assets/images/survey/gangnam/1_2.png'),
-
-    //
-  ];
-  // 이미지 로딩 완료 여부
-  bool _imagesLoaded = false;
-
-  // 슬라이드 컨트롤러
-  final PageController _surveyPageController = PageController();
 
   // Play 타이머 만료 여부 (만료 전까지 다음 버튼 비활성화)
   bool _playTimerExpired = false;
@@ -75,8 +61,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // keepalive 타이머
   Timer? _keepaliveTimer;
 
-  // A신호 반복 타이머
+  // A신호 반복 타이머 + ACK 구독
   Timer? _aSignalTimer;
+  StreamSubscription<String>? _ackSubscription;
 
   // 숨겨진 관리자 진입용
   int _tapCount = 0;
@@ -146,16 +133,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     }
   }
 
-  void _onEndVideoEnd() {
-    if (_navigating) return;
-    final v = _endVideoController.value;
-    if (!v.isInitialized || v.isPlaying) return;
-    final remaining = v.duration - v.position;
-    if (remaining < const Duration(milliseconds: 300) &&
-        _state == AppState.end) {
-      if (mounted) _goTo(AppState.survey);
-    }
-  }
+  void _onEndVideoEnd() {}
 
   void _onPlayVideoEnd() {
     if (_navigating) return;
@@ -170,28 +148,12 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     }
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_imagesLoaded) {
-      _precacheAllImages();
-    }
-  }
-
-  Future<void> _precacheAllImages() async {
-    await Future.wait(
-      _allImages.map((img) => precacheImage(img, context).catchError((_) {})),
-    );
-    if (mounted) setState(() => _imagesLoaded = true);
-  }
-
   Future<void> _loadTimerSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _readySeconds = prefs.getInt('timer_ready') ?? 180;
       _playSeconds = prefs.getInt('timer_play') ?? 15;
       _endSeconds = prefs.getInt('timer_end') ?? 180;
-      _surveySeconds = prefs.getInt('timer_survey') ?? 180;
       _udp.targetIp = prefs.getString('target_ip') ?? '192.168.240.255';
       _udp.targetPort = prefs.getInt('target_port') ?? 10025;
     });
@@ -275,15 +237,30 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           if (!mounted || !_readyTimerActive) return;
           setState(() => _readyButtonVisible = true);
         });
-        // ready 진입 시 A신호 반복 시작
+        // ready1: A신호 반복 시작 (ACK 오면 정지)
+        // ready2: A신호 반복 정지
         if (newState == AppState.ready1) {
           _aSignalTimer?.cancel();
+          _ackSubscription?.cancel();
           _aSignalTimer = Timer.periodic(const Duration(milliseconds: 500), (
             _,
           ) {
             if (!mounted) return;
             _udp.sendToPort('A', _udp.commandPort);
           });
+          _ackSubscription = _udp.onAck.listen((ack) {
+            if (ack.trim() == 'A') {
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
+            }
+          });
+        } else if (newState == AppState.ready2) {
+          _aSignalTimer?.cancel();
+          _aSignalTimer = null;
+          _ackSubscription?.cancel();
+          _ackSubscription = null;
         }
       } else {
         _readyTimerActive = false;
@@ -292,6 +269,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         // ready 아닌 상태로 이동 시 A신호 반복 정지
         _aSignalTimer?.cancel();
         _aSignalTimer = null;
+        _ackSubscription?.cancel();
+        _ackSubscription = null;
       }
       switch (newState) {
         case AppState.idle:
@@ -317,9 +296,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           _endVideoController.play();
           _startEndUdpTimer();
           break;
-        case AppState.survey: // 설문 페이지 진입 시 END 영상 정지
-          _endVideoController.pause();
-          break;
       }
 
       _pageController.animateToPage(
@@ -335,7 +311,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           AppState.ready2 => _readySeconds,
           AppState.play => _playSeconds,
           AppState.end => _endSeconds,
-          AppState.survey => _surveySeconds,
           _ => 10,
         };
 
@@ -354,6 +329,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
               _udp.send('F');
               setState(() => _playTimerExpired = true);
             } else {
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
               _sendUdp('I').then((_) => _goTo(AppState.idle));
             }
           }
@@ -372,7 +351,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       AppState.ready2 => _readySeconds,
       AppState.play => _playSeconds,
       AppState.end => _endSeconds,
-      AppState.survey => _surveySeconds,
       _ => 10,
     };
     setState(() => _remaining = seconds);
@@ -380,6 +358,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       setState(() => _remaining--);
       if (_remaining <= 0) {
         t.cancel();
+        _aSignalTimer?.cancel();
+        _aSignalTimer = null;
+        _ackSubscription?.cancel();
+        _ackSubscription = null;
         _sendUdp('I').then((_) => _goTo(AppState.idle));
       }
     });
@@ -407,9 +389,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _endUdpTimer?.cancel();
     _keepaliveTimer?.cancel();
     _aSignalTimer?.cancel();
+    _ackSubscription?.cancel();
     _udp.dispose();
     _pageController.dispose();
-    _surveyPageController.dispose();
     _idleVideoController.dispose();
     _ready1VideoController.dispose();
     _ready2VideoController.dispose();
@@ -421,35 +403,32 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: !_imagesLoaded
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
-              children: [
-                PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _buildIdlePage(),
-                    _buildReady1Page(),
-                    _buildReady2Page(),
-                    _buildPlayPage(),
-                    _buildEndPage(),
-                    _buildSurveyPage(),
-                  ],
-                ),
-                // 좌측 상단 숨겨진 영역 — 8번 탭하면 테스트 페이지
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  width: 60,
-                  height: 60,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: _onAdminTap,
-                  ),
-                ),
-              ],
+      body: Stack(
+        children: [
+          PageView(
+            controller: _pageController,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _buildIdlePage(),
+              _buildReady1Page(),
+              _buildReady2Page(),
+              _buildPlayPage(),
+              _buildEndPage(),
+            ],
+          ),
+          // 좌측 상단 숨겨진 영역 — 8번 탭하면 테스트 페이지
+          Positioned(
+            left: 0,
+            top: 0,
+            width: 60,
+            height: 60,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _onAdminTap,
             ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -520,6 +499,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           ),
           ExitButton(
             onTap: () async {
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
               await _sendUdp('I');
               _goTo(AppState.idle);
             },
@@ -570,6 +553,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           ),
           ExitButton(
             onTap: () async {
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
               await _sendUdp('I');
               _goTo(AppState.idle);
             },
@@ -663,79 +650,24 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             isWhite: true,
             isVisible: false,
             onTap: () async {
-              await _sendUdp('B');
-              await _goTo(AppState.survey);
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
+              await _sendUdp('I');
+              _goTo(AppState.idle);
             },
           ),
           ExitButton(
             showImage: true,
             onTap: () async {
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
               await _sendUdp('I');
               _goTo(AppState.idle);
             },
-          ),
-        ],
-      ),
-    );
-  }
-
-  // === END 화면 (8_end ~ 10_end 슬라이드, 10_end에 첫화면 버튼) ===
-  Widget _buildSurveyPage() {
-    final surveyImages = _allImages;
-    return Listener(
-      onPointerDown: (_) => _resetTimer(),
-      child: Stack(
-        children: [
-          PageView(
-            controller: _surveyPageController,
-            children: [
-              for (int i = 0; i < surveyImages.length; i++)
-                Container(
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: surveyImages[i],
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  child: i == surveyImages.length - 1
-                      ? Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 30),
-                            child: GestureDetector(
-                              onTap: () async {
-                                await _sendUdp('I');
-                                _goTo(AppState.idle);
-                              },
-                              child: Container(
-                                width: 300,
-                                height: 100,
-                                color: Colors.transparent,
-                              ),
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
-            ],
-          ),
-          // 좌측 중앙 이전 버튼
-          PageNavButton(
-            isLeft: true,
-            isVisible: false,
-            onTap: () => _surveyPageController.previousPage(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            ),
-          ),
-          // 우측 중앙 다음 버튼
-          PageNavButton(
-            isLeft: false,
-            isVisible: false,
-            onTap: () => _surveyPageController.nextPage(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            ),
           ),
         ],
       ),
