@@ -91,20 +91,20 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   Future<void> _initVideos() async {
     final controllers = [
       _idleVideoController = VideoPlayerController.asset(
-        'assets/videos/gangnam/idle_p1.mp4',
+        'assets/videos/wis/idle_p1.mp4',
       ),
       _ready1VideoController = VideoPlayerController.asset(
-        'assets/videos/gangnam/ready_p1.mp4',
+        'assets/videos/wis/ready_p1.mp4',
       ),
       _ready2VideoController = VideoPlayerController.asset(
-        'assets/videos/gangnam/ready_p2.mp4',
+        'assets/videos/wis/ready_p2.mp4',
       ),
 
       _playVideoController = VideoPlayerController.asset(
-        'assets/videos/gangnam/play_p1.mp4',
+        'assets/videos/wis/play_p1.mp4',
       ),
       _endVideoController = VideoPlayerController.asset(
-        'assets/videos/gangnam/end_p1.mp4',
+        'assets/videos/wis/end_p1.mp4',
       ),
     ];
     await Future.wait(controllers.map((c) => c.initialize()));
@@ -152,7 +152,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _readySeconds = prefs.getInt('timer_ready') ?? 180;
-      _playSeconds = prefs.getInt('timer_play') ?? 15;
+      _playSeconds = prefs.getInt('timer_play') ?? 10;
       _endSeconds = prefs.getInt('timer_end') ?? 180;
       _udp.targetIp = prefs.getString('target_ip') ?? '192.168.240.255';
       _udp.targetPort = prefs.getInt('target_port') ?? 10025;
@@ -645,21 +645,21 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             },
           ),
 
-          PageNavButton(
-            isLeft: false,
-            isWhite: true,
-            isVisible: false,
-            onTap: () async {
-              _aSignalTimer?.cancel();
-              _aSignalTimer = null;
-              _ackSubscription?.cancel();
-              _ackSubscription = null;
-              await _sendUdp('I');
-              _goTo(AppState.idle);
-            },
-          ),
+          // PageNavButton(
+          //   isLeft: false,
+          //   isWhite: true,
+          //   isVisible: false,
+          //   onTap: () async {
+          //     _aSignalTimer?.cancel();
+          //     _aSignalTimer = null;
+          //     _ackSubscription?.cancel();
+          //     _ackSubscription = null;
+          //     await _sendUdp('I');
+          //     _goTo(AppState.idle);
+          //   },
+          // ),
           ExitButton(
-            showImage: true,
+            showImage: false,
             onTap: () async {
               _aSignalTimer?.cancel();
               _aSignalTimer = null;
