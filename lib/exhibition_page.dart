@@ -69,6 +69,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // end 영상 6초 타이머
   Timer? _endUdpTimer;
 
+  // A신호 반복 타이머 + ACK 구독
+  Timer? _aSignalTimer;
+  StreamSubscription<String>? _ackSubscription;
+
   // 숨겨진 관리자 진입용
   int _tapCount = 0;
   DateTime? _lastTap;
@@ -269,10 +273,32 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           if (!mounted || !_readyTimerActive) return;
           setState(() => _readyButtonVisible = true);
         });
+        // ready1: A신호 반복 시작 (ACK 오면 정지)
+        if (newState == AppState.ready1) {
+          _aSignalTimer?.cancel();
+          _ackSubscription?.cancel();
+          _aSignalTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+            if (!mounted) return;
+            _udp.sendToPort('A', _udp.commandPort);
+          });
+          _ackSubscription = _udp.onAck.listen((ack) {
+            if (ack.trim() == 'A') {
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
+            }
+          });
+        }
       } else {
         _readyTimerActive = false;
         _readyVideoTimer?.cancel();
         _readyVideoTimer = null;
+        // ready 아닌 상태로 이동 시 A신호 반복 정지
+        _aSignalTimer?.cancel();
+        _aSignalTimer = null;
+        _ackSubscription?.cancel();
+        _ackSubscription = null;
       }
       switch (newState) {
         case AppState.idle:
@@ -386,6 +412,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _timer?.cancel();
     _readyVideoTimer?.cancel();
     _endUdpTimer?.cancel();
+    _aSignalTimer?.cancel();
+    _ackSubscription?.cancel();
     _udp.dispose();
     _pageController.dispose();
     _surveyPageController.dispose();
