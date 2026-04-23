@@ -277,7 +277,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         if (newState == AppState.ready1) {
           _aSignalTimer?.cancel();
           _ackSubscription?.cancel();
-          _aSignalTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+          _aSignalTimer = Timer.periodic(const Duration(milliseconds: 500), (
+            _,
+          ) {
             if (!mounted) return;
             _udp.sendToPort('A', _udp.commandPort);
           });
@@ -630,7 +632,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             PageNavButton(
               isLeft: false,
               isWhite: true,
-              onTap: () async { await _sendUdp('F'); _goTo(AppState.end); },
+              onTap: () async {
+                await _sendUdp('F');
+                _goTo(AppState.end);
+              },
             ),
         ],
       ),
