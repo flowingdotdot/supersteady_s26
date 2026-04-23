@@ -69,6 +69,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // end 영상 6초 타이머
   Timer? _endUdpTimer;
 
+  // keepalive 타이머
+  Timer? _keepaliveTimer;
+
   // A신호 반복 타이머 + ACK 구독
   Timer? _aSignalTimer;
   StreamSubscription<String>? _ackSubscription;
@@ -91,6 +94,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _loadTimerSettings();
     _initVideos();
     _motor.setup();
+    _keepaliveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _udp.sendToPort('K', _udp.commandPort);
+    });
   }
 
   Future<void> _initVideos() async {
@@ -206,11 +212,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   }
 
   Future<void> _sendUdp(String command) async {
-    if (command != 'A') {
-      for (int i = 0; i < 3; i++) {
-        await _udp.sendToPort(command, _udp.commandPort);
-        if (i < 2) await Future.delayed(const Duration(milliseconds: 50));
-      }
+    for (int i = 0; i < 5; i++) {
+      await _udp.sendToPort(command, _udp.commandPort);
+      if (i < 4) await Future.delayed(const Duration(milliseconds: 50));
     }
     // 바이너리 프레임도 함께 전송 (모터드라이버 직접 통신용)
     switch (command) {
@@ -235,10 +239,6 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         await _motor.saveOrigin();
         break;
       case 'A':
-        for (int i = 0; i < 5; i++) {
-          await _udp.sendToPort('A', _udp.commandPort);
-          if (i < 4) await Future.delayed(const Duration(milliseconds: 50));
-        }
         break;
       case 'B':
         break;
@@ -273,10 +273,13 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           if (!mounted || !_readyTimerActive) return;
           setState(() => _readyButtonVisible = true);
         });
+        // ready2 진입 시에도 포함해 항상 기존 A신호 타이머 취소
+        _aSignalTimer?.cancel();
+        _aSignalTimer = null;
+        _ackSubscription?.cancel();
+        _ackSubscription = null;
         // ready1: A신호 반복 시작 (ACK 오면 정지)
         if (newState == AppState.ready1) {
-          _aSignalTimer?.cancel();
-          _ackSubscription?.cancel();
           _aSignalTimer = Timer.periodic(const Duration(milliseconds: 500), (
             _,
           ) {
@@ -363,6 +366,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
               _udp.send('F');
               setState(() => _playTimerExpired = true);
             } else {
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
               _sendUdp('I').then((_) => _goTo(AppState.idle));
             }
           }
@@ -389,6 +396,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       setState(() => _remaining--);
       if (_remaining <= 0) {
         t.cancel();
+        _aSignalTimer?.cancel();
+        _aSignalTimer = null;
+        _ackSubscription?.cancel();
+        _ackSubscription = null;
         _sendUdp('I').then((_) => _goTo(AppState.idle));
       }
     });
@@ -414,6 +425,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _timer?.cancel();
     _readyVideoTimer?.cancel();
     _endUdpTimer?.cancel();
+    _keepaliveTimer?.cancel();
     _aSignalTimer?.cancel();
     _ackSubscription?.cancel();
     _udp.dispose();
@@ -529,6 +541,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           ),
           ExitButton(
             onTap: () async {
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
               await _sendUdp('I');
               _goTo(AppState.idle);
             },
@@ -677,7 +693,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             },
           ),
           ExitButton(
-            showImage: true,
+            showImage: false,
             onTap: () async {
               await _sendUdp('I');
               _goTo(AppState.idle);
