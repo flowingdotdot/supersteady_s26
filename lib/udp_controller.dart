@@ -46,16 +46,22 @@ class UdpController {
   String targetIp = '192.168.240.255';
   int targetPort = 10025;
   int commandPort = 10025;
+  int ackPort = 10026;
 
   RawDatagramSocket? _socket;
+  RawDatagramSocket? _ackSocket;
   final _receiveController = StreamController<String>.broadcast();
   final _sendController = StreamController<String>.broadcast();
+  final _ackController = StreamController<String>.broadcast();
 
   /// 수신된 UDP 메시지 스트림
   Stream<String> get onReceive => _receiveController.stream;
 
   /// 송신된 UDP 메시지 스트림
   Stream<String> get onSend => _sendController.stream;
+
+  /// ACK 수신 스트림 (10026 포트)
+  Stream<String> get onAck => _ackController.stream;
 
   static final instance = UdpController._();
 
@@ -73,6 +79,19 @@ class UdpController {
             'UDP 수신: $message ← ${datagram.address.address}:${datagram.port}',
           );
           _receiveController.add(message);
+        }
+      }
+    });
+
+    _ackSocket?.close();
+    _ackSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, ackPort);
+    _ackSocket!.listen((event) {
+      if (event == RawSocketEvent.read) {
+        final datagram = _ackSocket!.receive();
+        if (datagram != null) {
+          final message = utf8.decode(datagram.data);
+          debugPrint('UDP ACK 수신: $message ← ${datagram.address.address}:${datagram.port}');
+          _ackController.add(message);
         }
       }
     });
@@ -100,6 +119,8 @@ class UdpController {
       debugPrint('UDP 전송 실패: $e');
       _socket?.close();
       _socket = null;
+      _ackSocket?.close();
+      _ackSocket = null;
     }
   }
 
@@ -120,6 +141,8 @@ class UdpController {
       debugPrint('UDP 전송 실패: $e');
       _socket?.close();
       _socket = null;
+      _ackSocket?.close();
+      _ackSocket = null;
     }
   }
 
@@ -144,6 +167,8 @@ class UdpController {
             debugPrint('UDP fast 전송 실패: $e');
             _socket?.close();
             _socket = null;
+            _ackSocket?.close();
+            _ackSocket = null;
           });
       return;
     }
@@ -162,6 +187,8 @@ class UdpController {
       debugPrint('UDP fast 전송 실패: $e');
       _socket?.close();
       _socket = null;
+      _ackSocket?.close();
+      _ackSocket = null;
     }
   }
 
@@ -178,13 +205,18 @@ class UdpController {
       debugPrint('UDP sendBytes 실패: $e');
       _socket?.close();
       _socket = null;
+      _ackSocket?.close();
+      _ackSocket = null;
     }
   }
 
   void dispose() {
     _socket?.close();
     _socket = null;
+    _ackSocket?.close();
+    _ackSocket = null;
     _receiveController.close();
     _sendController.close();
+    _ackController.close();
   }
 }

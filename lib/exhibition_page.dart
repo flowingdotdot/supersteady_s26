@@ -45,7 +45,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // 모든 에셋 이미지 (시작 시 미리 로드)
   static const _allImages = [
     AssetImage('assets/images/survey/gangnam/1_1.png'),
-    AssetImage('assets/images/survey/gangnam/1_2.jpg'),
+    AssetImage('assets/images/survey/gangnam/1_2.png'),
 
     //
   ];
@@ -75,8 +75,9 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   // keepalive 타이머
   Timer? _keepaliveTimer;
 
-  // A신호 반복 타이머
+  // A신호 반복 타이머 + ACK 구독
   Timer? _aSignalTimer;
+  StreamSubscription<String>? _ackSubscription;
 
   // 숨겨진 관리자 진입용
   int _tapCount = 0;
@@ -275,12 +276,21 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           if (!mounted || !_readyTimerActive) return;
           setState(() => _readyButtonVisible = true);
         });
-        // ready 진입 시 A신호 반복 시작
+        // ready1: A신호 반복 시작 (ACK 오면 정지)
         if (newState == AppState.ready1) {
           _aSignalTimer?.cancel();
+          _ackSubscription?.cancel();
           _aSignalTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
             if (!mounted) return;
             _udp.sendToPort('A', _udp.commandPort);
+          });
+          _ackSubscription = _udp.onAck.listen((ack) {
+            if (ack.trim() == 'A') {
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
+            }
           });
         }
       } else {
@@ -290,6 +300,8 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
         // ready 아닌 상태로 이동 시 A신호 반복 정지
         _aSignalTimer?.cancel();
         _aSignalTimer = null;
+        _ackSubscription?.cancel();
+        _ackSubscription = null;
       }
       switch (newState) {
         case AppState.idle:
@@ -405,6 +417,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _endUdpTimer?.cancel();
     _keepaliveTimer?.cancel();
     _aSignalTimer?.cancel();
+    _ackSubscription?.cancel();
     _udp.dispose();
     _pageController.dispose();
     _surveyPageController.dispose();
@@ -621,7 +634,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
             PageNavButton(
               isLeft: false,
               isWhite: true,
-              onTap: () async { await _sendUdp('F'); _goTo(AppState.end); },
+              onTap: () async {
+                await _sendUdp('F');
+                _goTo(AppState.end);
+              },
             ),
         ],
       ),
