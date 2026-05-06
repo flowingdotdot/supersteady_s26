@@ -23,7 +23,8 @@ class ExhibitionPage extends StatefulWidget {
   State<ExhibitionPage> createState() => _ExhibitionPageState();
 }
 
-class _ExhibitionPageState extends State<ExhibitionPage> {
+class _ExhibitionPageState extends State<ExhibitionPage>
+    with WidgetsBindingObserver {
   final PageController _pageController = PageController();
   AppState _state = AppState.idle;
   Timer? _timer;
@@ -93,6 +94,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WakelockPlus.enable();
     _loadTimerSettings();
     _initVideos();
@@ -100,6 +102,13 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _keepaliveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _udp.sendToPort('K', _udp.commandPort);
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _udp.init();
+    }
   }
 
   Future<void> _initVideos() async {
@@ -276,11 +285,16 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           if (!mounted || !_readyTimerActive) return;
           setState(() => _readyButtonVisible = true);
         });
+        // ready2 진입 시에도 포함해 항상 기존 A신호 타이머 취소
+        _aSignalTimer?.cancel();
+        _aSignalTimer = null;
+        _ackSubscription?.cancel();
+        _ackSubscription = null;
         // ready1: A신호 반복 시작 (ACK 오면 정지)
         if (newState == AppState.ready1) {
-          _aSignalTimer?.cancel();
-          _ackSubscription?.cancel();
-          _aSignalTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+          _aSignalTimer = Timer.periodic(const Duration(milliseconds: 500), (
+            _,
+          ) {
             if (!mounted) return;
             _udp.sendToPort('A', _udp.commandPort);
           });
@@ -364,6 +378,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
               _udp.send('F');
               setState(() => _playTimerExpired = true);
             } else {
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
               _sendUdp('I').then((_) => _goTo(AppState.idle));
             }
           }
@@ -390,6 +408,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
       setState(() => _remaining--);
       if (_remaining <= 0) {
         t.cancel();
+        _aSignalTimer?.cancel();
+        _aSignalTimer = null;
+        _ackSubscription?.cancel();
+        _ackSubscription = null;
         _sendUdp('I').then((_) => _goTo(AppState.idle));
       }
     });
@@ -412,6 +434,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _readyVideoTimer?.cancel();
     _endUdpTimer?.cancel();
@@ -531,6 +554,10 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
           ),
           ExitButton(
             onTap: () async {
+              _aSignalTimer?.cancel();
+              _aSignalTimer = null;
+              _ackSubscription?.cancel();
+              _ackSubscription = null;
               await _sendUdp('I');
               _goTo(AppState.idle);
             },
