@@ -23,7 +23,8 @@ class ExhibitionPage extends StatefulWidget {
   State<ExhibitionPage> createState() => _ExhibitionPageState();
 }
 
-class _ExhibitionPageState extends State<ExhibitionPage> {
+class _ExhibitionPageState extends State<ExhibitionPage>
+    with WidgetsBindingObserver {
   final PageController _pageController = PageController();
   AppState _state = AppState.idle;
   Timer? _timer;
@@ -90,6 +91,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WakelockPlus.enable();
     _loadTimerSettings();
     _initVideos();
@@ -97,6 +99,13 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
     _keepaliveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _udp.sendToPort('K', _udp.commandPort);
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _udp.init();
+    }
   }
 
   Future<void> _initVideos() async {
@@ -422,6 +431,7 @@ class _ExhibitionPageState extends State<ExhibitionPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _readyVideoTimer?.cancel();
     _endUdpTimer?.cancel();

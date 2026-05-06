@@ -68,6 +68,8 @@ class UdpController {
   UdpController._();
 
   Future<void> init() async {
+    _socket?.close();
+    _socket = null;
     _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
     _socket!.broadcastEnabled = true;
     _socket!.listen((event) {
