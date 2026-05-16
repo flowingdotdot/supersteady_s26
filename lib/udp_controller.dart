@@ -72,31 +72,47 @@ class UdpController {
     _socket = null;
     _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
     _socket!.broadcastEnabled = true;
-    _socket!.listen((event) {
-      if (event == RawSocketEvent.read) {
-        final datagram = _socket!.receive();
-        if (datagram != null) {
-          final message = utf8.decode(datagram.data);
-          debugPrint(
-            'UDP 수신: $message ← ${datagram.address.address}:${datagram.port}',
-          );
-          _receiveController.add(message);
+    _socket!.listen(
+      (event) {
+        if (event == RawSocketEvent.read) {
+          final datagram = _socket!.receive();
+          if (datagram != null) {
+            final message = utf8.decode(datagram.data);
+            debugPrint(
+              'UDP 수신: $message ← ${datagram.address.address}:${datagram.port}',
+            );
+            _receiveController.add(message);
+          }
         }
-      }
-    });
+      },
+      onError: (e) {
+        debugPrint('UDP 소켓 오류: $e');
+        _socket?.close();
+        _socket = null;
+      },
+    );
 
     _ackSocket?.close();
     _ackSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, ackPort);
-    _ackSocket!.listen((event) {
-      if (event == RawSocketEvent.read) {
-        final datagram = _ackSocket!.receive();
-        if (datagram != null) {
-          final message = utf8.decode(datagram.data);
-          debugPrint('UDP ACK 수신: $message ← ${datagram.address.address}:${datagram.port}');
-          _ackController.add(message);
+    _ackSocket!.listen(
+      (event) {
+        if (event == RawSocketEvent.read) {
+          final datagram = _ackSocket!.receive();
+          if (datagram != null) {
+            final message = utf8.decode(datagram.data);
+            debugPrint(
+              'UDP ACK 수신: $message ← ${datagram.address.address}:${datagram.port}',
+            );
+            _ackController.add(message);
+          }
         }
-      }
-    });
+      },
+      onError: (e) {
+        debugPrint('UDP ACK 소켓 오류: $e');
+        _ackSocket?.close();
+        _ackSocket = null;
+      },
+    );
   }
 
   Future<RawDatagramSocket> _getSocket() async {

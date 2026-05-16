@@ -107,7 +107,14 @@ class _ExhibitionPageState extends State<ExhibitionPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _udp.init();
+      _udp.init().catchError((_) {});
+      _keepaliveTimer?.cancel();
+      _keepaliveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+        _udp.sendToPort('K', _udp.commandPort);
+      });
+    } else if (state == AppLifecycleState.paused) {
+      _keepaliveTimer?.cancel();
+      _keepaliveTimer = null;
     }
   }
 
